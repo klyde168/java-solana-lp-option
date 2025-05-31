@@ -33,4 +33,4 @@ build/
 .vscode/
 
 # 忽略所有 application 相關屬性檔案
-src/main/resources/application*.properties
+src/main/resources/application.properties
