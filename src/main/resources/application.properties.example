@@ -1,0 +1,17 @@
+# 資料庫配置
+spring.datasource.url=jdbc:postgresql://localhost:5432/solana_lp_db
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# API 配置
+deribit.api.url=https://www.deribit.com/api/v2
+deribit.api.key=your_deribit_api_key
+deribit.api.secret=your_deribit_api_secret
+raydium.api.url=https://api.raydium.io/v2
+raydium.rpc.url=your_solana_rpc_url
+
+# 排程配置
+scheduler.cron=0 0 * * * *

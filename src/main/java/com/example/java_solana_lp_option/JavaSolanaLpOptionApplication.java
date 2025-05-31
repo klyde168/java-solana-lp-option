@@ -8,6 +8,7 @@ public class JavaSolanaLpOptionApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(JavaSolanaLpOptionApplication.class, args);
+	System.out.println("hello world");
 	}
 
 }
