@@ -7,9 +7,16 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 # JPA/Hibernate 配置
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
-spring.jpa.show-sql=true
+spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.format_sql=true
 
+# 連線池配置
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.connection-timeout=20000
+
 # 日誌配置
-logging.level.org.hibernate.SQL=DEBUG
-logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+logging.level.org.hibernate.SQL=INFO
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=INFO
+# 暫時移除所有資料庫相關設定
+logging.level.com.example.java_solana_lp_option=INFO

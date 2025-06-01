@@ -42,12 +42,12 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
      * 公開方法供其他類別呼叫，查詢指定工具的訂單簿資料
      */
     public void fetchOrderBookData(String instrumentName) {
-        System.out.println("\n=== 開始查詢 " + instrumentName + " 訂單簿資料 ===");
+        // System.out.println("\n=== 開始查詢 " + instrumentName + " 訂單簿資料 ===");
         
         try {
             String apiUrl = "https://www.deribit.com/api/v2/public/get_order_book?depth=5&instrument_name=" + instrumentName;
             
-            System.out.println("正在呼叫 API: " + apiUrl);
+            // System.out.println("正在呼叫 API: " + apiUrl);
             
             ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
             
@@ -58,8 +58,6 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
                 // 解析 JSON 回應
                 JsonNode result = jsonNode.get("result");
                 if (result != null) {
-                    displayOrderBookData(result, instrumentName);
-                    
                     // 儲存資料到資料庫
                     saveToDatabase(result, instrumentName);
                 } else {
@@ -75,79 +73,10 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
             e.printStackTrace();
         }
         
-        System.out.println("=== " + instrumentName + " 訂單簿查詢完成 ===");
+        // System.out.println("=== " + instrumentName + " 訂單簿查詢完成 ===");
     }
     
-    /**
-     * 顯示訂單簿資料
-     */
-    private void displayOrderBookData(JsonNode result, String instrumentName) {
-        System.out.println("=".repeat(80));
-        System.out.printf("📊 工具名稱: %s%n", instrumentName);
-        System.out.println("=".repeat(80));
-        
-        // 基本資訊
-        displayBasicInfo(result);
-        
-        // 希臘字母和價格資訊
-        displayGreeksAndPricing(result);
-    }
-    
-    /**
-     * 顯示基本資訊
-     */
-    private void displayBasicInfo(JsonNode result) {
-        String state = getStringValue(result, "state");
-        long timestamp = result.get("timestamp").asLong();
-        String changeId = getStringValue(result, "change_id");
-        String formattedDate = formatTimestamp(String.valueOf(timestamp));
-        
-        System.out.printf("📈 狀態: %s%n", state);
-        System.out.printf("🕐 時間: %s%n", formattedDate);
-        System.out.printf("🔄 變更ID: %s%n", changeId);
-        System.out.println("-".repeat(50));
-    }
-    
-    /**
-     * 顯示希臘字母和價格資訊
-     */
-    private void displayGreeksAndPricing(JsonNode result) {
-        System.out.println("🔢 希臘字母和價格資訊:");
-        System.out.println("-".repeat(50));
-        
-        // 希臘字母 - 從 greeks 物件中取得
-        JsonNode greeks = result.get("greeks");
-        if (greeks != null) {
-            System.out.printf("📊 Delta: %s%n", getDoubleValue(greeks, "delta"));
-            System.out.printf("📊 Gamma: %s%n", getDoubleValue(greeks, "gamma"));
-            System.out.printf("📊 Vega: %s%n", getDoubleValue(greeks, "vega"));
-            System.out.printf("📊 Theta: %s%n", getDoubleValue(greeks, "theta"));
-            System.out.printf("📊 Rho: %s%n", getDoubleValue(greeks, "rho"));
-        } else {
-            System.out.println("📊 希臘字母資料不可用");
-        }
-        
-        System.out.println();
-        
-        // 價格資訊
-        System.out.printf("💰 指數價格 (Index Price): %s%n", getDoubleValue(result, "index_price"));
-        System.out.printf("💰 標的價格 (Underlying Price): %s%n", getDoubleValue(result, "underlying_price"));
-        System.out.printf("💰 標記價格 (Mark Price): %s%n", getDoubleValue(result, "mark_price"));
-        
-        System.out.println();
-        
-        // 未平倉合約
-        System.out.printf("📈 未平倉合約 (Open Interest): %s%n", getDoubleValue(result, "open_interest"));
-        
-        System.out.println();
-        
-        // 隱含波動率
-        System.out.printf("📊 標記隱含波動率 (Mark IV): %s%n", getDoubleValue(result, "mark_iv"));
-        System.out.printf("📊 買方隱含波動率 (Bid IV): %s%n", getDoubleValue(result, "bid_iv"));
-        System.out.printf("📊 賣方隱含波動率 (Ask IV): %s%n", getDoubleValue(result, "ask_iv"));
-        
-        System.out.println("-".repeat(50));
-    }
+    // 移除未使用的顯示方法以避免 IDE 警告
     
     /**
      * 將時間戳記轉換為 yyyy/MM/dd HH:mm:ss 格式
@@ -178,17 +107,6 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
     }
     
     /**
-     * 安全取得數值字串
-     */
-    private String getDoubleValue(JsonNode node, String fieldName) {
-        JsonNode field = node.get(fieldName);
-        if (field != null && !field.isNull()) {
-            return String.format("%.6f", field.asDouble());
-        }
-        return "N/A";
-    }
-    
-    /**
      * 安全取得數值
      */
     private double getDoubleValueAsDouble(JsonNode node, String fieldName) {
@@ -204,7 +122,7 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
      */
     private void saveToDatabase(JsonNode result, String instrumentName) {
         try {
-            System.out.println("\n💾 正在儲存資料到資料庫...");
+            System.out.println("💾 正在儲存資料到資料庫...");
             
             OptionData optionData = new OptionData();
             
@@ -240,7 +158,10 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
             OptionData savedData = optionDataRepository.save(optionData);
             
             System.out.printf("✅ 資料已成功儲存到資料庫！記錄ID: %d%n", savedData.getId());
+            
+            /* 註解掉詳細資訊顯示
             System.out.printf("📊 工具: %s, 時間: %s%n", savedData.getInstrumentName(), savedData.getFormattedTime());
+            */
             
         } catch (Exception e) {
             System.err.println("❌ 儲存資料到資料庫時發生錯誤: " + e.getMessage());

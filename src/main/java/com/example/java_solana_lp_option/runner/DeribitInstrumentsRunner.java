@@ -12,7 +12,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.beans.factory.annotation.Autowired;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +24,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
     private final DateTimeFormatter dateFormatter;
     private final DeribitOrderBookRunner orderBookRunner;
 
-    @Autowired
+    // 移除不必要的 @Autowired 註解
     public DeribitInstrumentsRunner(DeribitOrderBookRunner orderBookRunner) {
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
