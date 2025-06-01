@@ -5,6 +5,7 @@ import com.example.java_solana_lp_option.repository.RaydiumV3PoolDataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired; // 確保 Autowired 被導入
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -17,7 +18,8 @@ import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-//@Component
+@Component
+@Order(3) 
 public class RaydiumV3PoolInfoFetcher {
 
     private final RestTemplate restTemplate;

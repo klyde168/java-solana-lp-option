@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.util.ArrayList;
 import java.util.List;
 
-//@Component
+@Component
 @Order(1)
 public class DeribitInstrumentsRunner implements CommandLineRunner {
 
@@ -40,7 +40,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
         System.out.println("   🕐 每1小時執行：每小時的整點");
         System.out.println("   🕐 每3分鐘執行：每小時的 0, 3, 6, 9... 分");
         
-        //fetchInstruments("啟動時執行");
+        fetchInstruments("啟動時執行");
     }
     
     @Scheduled(cron = "0 0 */8 * * *")

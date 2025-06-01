@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-//@Component
+@Component
 @Order(2) // 讓這個 Runner 在 DeribitInstrumentsRunner 之後執行
 public class DeribitOrderBookRunner implements CommandLineRunner {
 
