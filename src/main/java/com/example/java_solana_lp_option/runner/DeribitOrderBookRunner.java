@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.core.annotation.Order;
 import com.example.java_solana_lp_option.entity.OptionData;
 import com.example.java_solana_lp_option.repository.OptionDataRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -23,6 +24,7 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
     private final DateTimeFormatter dateFormatter;
     private final OptionDataRepository optionDataRepository;
 
+    @Autowired
     public DeribitOrderBookRunner(OptionDataRepository optionDataRepository) {
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
@@ -75,8 +77,6 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
         
         // System.out.println("=== " + instrumentName + " 訂單簿查詢完成 ===");
     }
-    
-    // 移除未使用的顯示方法以避免 IDE 警告
     
     /**
      * 將時間戳記轉換為 yyyy/MM/dd HH:mm:ss 格式

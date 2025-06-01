@@ -12,6 +12,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,14 +24,14 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final DateTimeFormatter dateFormatter;
-    private final DeribitOrderBookRunner orderBookRunner;
+    
+    @Autowired
+    private ApplicationContext applicationContext;
 
-    // 移除不必要的 @Autowired 註解
-    public DeribitInstrumentsRunner(DeribitOrderBookRunner orderBookRunner) {
+    public DeribitInstrumentsRunner() {
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
         this.dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
-        this.orderBookRunner = orderBookRunner;
     }
 
     @Override
@@ -144,33 +146,41 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
      * 逐一處理工具列表，每秒傳送一個給 OrderBookRunner
      */
     private void processInstrumentsWithDelay(List<String> instruments) {
-        for (int i = 0; i < instruments.size(); i++) {
-            String instrumentName = instruments.get(i);
+        try {
+            // 使用 ApplicationContext 來獲取 OrderBookRunner，避免循環依賴
+            DeribitOrderBookRunner orderBookRunner = applicationContext.getBean(DeribitOrderBookRunner.class);
             
-            try {
-                System.out.printf("\n📊 處理第 %d/%d 個工具: %s%n", 
-                    i + 1, instruments.size(), instrumentName);
+            for (int i = 0; i < instruments.size(); i++) {
+                String instrumentName = instruments.get(i);
                 
-                // 呼叫 OrderBookRunner 的方法
-                orderBookRunner.fetchOrderBookData(instrumentName);
-                
-                // 如果不是最後一個，等待1秒
-                if (i < instruments.size() - 1) {
-                    System.out.println("⏱️  等待 1 秒後處理下一個工具...");
-                    Thread.sleep(1000); // 等待1秒
+                try {
+                    System.out.printf("\n📊 處理第 %d/%d 個工具: %s%n", 
+                        i + 1, instruments.size(), instrumentName);
+                    
+                    // 呼叫 OrderBookRunner 的方法
+                    orderBookRunner.fetchOrderBookData(instrumentName);
+                    
+                    // 如果不是最後一個，等待1秒
+                    if (i < instruments.size() - 1) {
+                        System.out.println("⏱️  等待 1 秒後處理下一個工具...");
+                        Thread.sleep(1000); // 等待1秒
+                    }
+                    
+                } catch (InterruptedException e) {
+                    System.err.println("❌ 延遲中斷: " + e.getMessage());
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    System.err.printf("❌ 處理工具 %s 時發生錯誤: %s%n", instrumentName, e.getMessage());
+                    // 繼續處理下一個工具
                 }
-                
-            } catch (InterruptedException e) {
-                System.err.println("❌ 延遲中斷: " + e.getMessage());
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                System.err.printf("❌ 處理工具 %s 時發生錯誤: %s%n", instrumentName, e.getMessage());
-                // 繼續處理下一個工具
             }
+            
+            System.out.printf("\n✅ 完成處理 %d 個 SOL 工具的訂單簿查詢%n", instruments.size());
+            
+        } catch (Exception e) {
+            System.err.println("❌ 無法獲取 DeribitOrderBookRunner Bean: " + e.getMessage());
         }
-        
-        System.out.printf("\n✅ 完成處理 %d 個 SOL 工具的訂單簿查詢%n", instruments.size());
     }
     
     private String formatTimestamp(String timestampStr) {
