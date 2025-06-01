@@ -1,35 +1,37 @@
 # Java Solana LP Option
 
-一個基於 Spring Boot 的應用程式，用於自動取得和儲存 Deribit SOL 選擇權的市場資料。
+一個基於 Spring Boot 的應用程式，整合了 Deribit 選擇權資料收集、Raydium 流動性池監控和 CLMM Position 分析功能。
 
-## 功能特色
+## 🌟 功能特色
 
-### 🔄 自動排程任務
-- **每 8 小時**：查詢所有 SOL 基礎貨幣的選擇權工具列表
-- **每 1 小時**：定期更新工具列表
-- **每 3 分鐘**：高頻率監控市場變化
+### 🔄 Deribit 選擇權資料收集
+- **自動排程任務**：每 8 小時查詢 SOL 基礎貨幣的選擇權工具列表
+- **高頻率監控**：每 3 分鐘更新市場資料
+- **希臘字母收集**：自動儲存 Delta, Gamma, Vega, Theta, Rho
+- **價格與 IV 監控**：記錄指數價格、標的價格、隱含波動率
 
-### 📊 資料收集
-- 自動篩選 `base_currency` 為 SOL 的選擇權工具
-- 逐一查詢每個工具的詳細訂單簿資料
-- 限制每秒一次 API 呼叫，避免觸及 API 限制
+### 🏊 Raydium 流動性池監控
+- **池資訊追蹤**：自動獲取和儲存 V3 池的詳細資訊
+- **TVL 與交易量**：監控總鎖倉價值和 24 小時交易量
+- **APR 計算**：追蹤手續費年化收益率和總 APR
+- **定期更新**：每 8 小時自動同步最新數據
 
-### 💾 資料儲存
-- 將希臘字母（Delta, Gamma, Vega, Theta, Rho）儲存到 PostgreSQL
-- 記錄價格資訊（指數價格、標的價格、標記價格）
-- 儲存隱含波動率和未平倉合約資料
-- 自動記錄時間戳記和格式化時間
+### 📊 CLMM Position 分析器 (NEW!)
+- **實時 Position 分析**：分析 Raydium CLMM Position NFT
+- **區塊鏈數據讀取**：直接從 Solana 節點獲取 tick 範圍
+- **收益追蹤**：監控未領取手續費和獎勵
+- **價格範圍分析**：計算當前價格在 Position 範圍內的位置
+- **批次處理**：支援同時分析多個 Position
 
-### 📈 監控資料
-收集的資料包括：
-- **希臘字母**：Delta, Gamma, Vega, Theta, Rho
-- **價格資訊**：Index Price, Underlying Price, Mark Price
-- **市場資訊**：Open Interest, Mark IV, Bid IV, Ask IV
-- **時間資訊**：原始時間戳記 + 格式化時間（yyyy/MM/dd HH:mm:ss）
+### 💾 資料儲存與管理
+- **PostgreSQL 資料庫**：儲存所有歷史資料
+- **JPA 實體映射**：結構化的資料模型
+- **時間序列資料**：支援歷史趨勢分析
+- **索引優化**：高效的資料查詢
 
-## 技術架構
+## 🏗️ 技術架構
 
-### 後端技術
+### 後端技術棧
 - **Spring Boot 4.0.0-SNAPSHOT**
 - **Java 17**
 - **PostgreSQL** 資料庫
@@ -37,18 +39,24 @@
 - **Jackson** JSON 處理
 - **Spring Scheduling** 任務排程
 
-### API 來源
-- **Deribit Public API**
-  - 工具列表：`/api/v2/public/get_instruments`
-  - 訂單簿：`/api/v2/public/get_order_book`
+### 區塊鏈整合
+- **Solana RPC 客戶端**：直接與 Solana 節點通信
+- **Token Extensions 解析**：支援 Token Extensions Program
+- **Raydium CLMM 協議**：深度整合 CLMM Position 分析
 
-## 快速開始
+### API 數據來源
+- **Deribit Public API**：選擇權市場資料
+- **Raydium V3 API**：流動性池資訊
+- **Solana RPC**：區塊鏈原生資料
+
+## 🚀 快速開始
 
 ### 環境需求
 ```bash
 - Java 17+
 - PostgreSQL 12+
 - Maven 3.6+
+- Solana RPC 存取 (可選)
 ```
 
 ### 1. 複製專案
@@ -85,14 +93,28 @@ spring.datasource.driver-class-name=org.postgresql.Driver
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
+
+# Solana 節點配置
+solana.rpcUrl=https://api.mainnet-beta.solana.com
+solana.enableBlockchainData=true
+solana.network=mainnet-beta
+solana.connectTimeout=30000
+solana.readTimeout=60000
+solana.maxRetries=5
 
 # 日誌配置
 logging.level.org.hibernate.SQL=DEBUG
-logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+logging.level.com.example.java_solana_lp_option=INFO
 ```
 
-### 4. 執行應用程式
+### 4. 環境變數配置（可選）
+```bash
+# CLMM Position 分析
+export CLMM_POSITION_ID=68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o
+export CLMM_BATCH_POSITION_IDS=68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o,9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM
+```
+
+### 5. 執行應用程式
 ```bash
 # 使用 Maven Wrapper
 ./mvnw spring-boot:run
@@ -102,27 +124,37 @@ logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
 java -jar target/java-solana-lp-option-0.0.1-SNAPSHOT.jar
 ```
 
-## 專案結構
+## 📁 專案結構
 
 ```
 src/main/java/com/example/java_solana_lp_option/
 ├── JavaSolanaLpOptionApplication.java          # 主應用程式
 ├── entity/
-│   └── OptionData.java                         # 資料實體類別
+│   ├── OptionData.java                         # 選擇權資料實體
+│   └── RaydiumV3PoolData.java                  # Raydium V3 池資料實體
 ├── repository/
-│   └── OptionDataRepository.java               # 資料庫操作介面
-└── runner/
-    ├── DeribitInstrumentsRunner.java           # 工具列表查詢（排程任務）
-    └── DeribitOrderBookRunner.java             # 訂單簿資料查詢
+│   ├── OptionDataRepository.java               # 選擇權資料庫操作
+│   └── RaydiumV3PoolDataRepository.java        # 池資料庫操作
+├── runner/
+│   ├── DeribitInstrumentsRunner.java           # Deribit 工具列表查詢
+│   ├── DeribitOrderBookRunner.java             # 訂單簿資料查詢
+│   ├── RaydiumV3PoolInfoFetcher.java           # Raydium 池資訊獲取
+│   └── CLMMPositionRunner.java                 # CLMM Position 分析器
+├── analyzer/
+│   └── CLMMPositionAnalyzer.java               # CLMM Position 核心分析邏輯
+├── service/
+│   └── SolanaService.java                      # Solana 區塊鏈服務
+└── config/
+    └── SolanaConfig.java                       # Solana 配置管理
 
 src/main/resources/
 ├── application.properties                      # 應用程式設定
 └── application.properties.example             # 設定範例檔
 ```
 
-## 資料表結構
+## 📊 資料表結構
 
-### option_data 表
+### option_data 表（Deribit 選擇權資料）
 | 欄位名稱 | 類型 | 說明 |
 |---------|------|------|
 | id | BIGINT | 主鍵（自動遞增）|
@@ -130,165 +162,238 @@ src/main/resources/
 | state | VARCHAR | 狀態 |
 | timestamp_value | BIGINT | 原始時間戳記 |
 | formatted_time | VARCHAR | 格式化時間 |
-| change_id | VARCHAR | 變更ID |
 | delta_value | DOUBLE | Delta 希臘字母 |
 | gamma_value | DOUBLE | Gamma 希臘字母 |
 | vega_value | DOUBLE | Vega 希臘字母 |
 | theta_value | DOUBLE | Theta 希臘字母 |
 | rho_value | DOUBLE | Rho 希臘字母 |
 | index_price | DOUBLE | 指數價格 |
-| underlying_price | DOUBLE | 標的價格 |
 | mark_price | DOUBLE | 標記價格 |
 | open_interest | DOUBLE | 未平倉合約 |
 | mark_iv | DOUBLE | 標記隱含波動率 |
-| bid_iv | DOUBLE | 買方隱含波動率 |
-| ask_iv | DOUBLE | 賣方隱含波動率 |
 | created_at | TIMESTAMP | 建立時間 |
 
-## 執行日誌範例
+### raydium_v3_pool_data 表（Raydium 池資料）
+| 欄位名稱 | 類型 | 說明 |
+|---------|------|------|
+| id | BIGINT | 主鍵（自動遞增）|
+| pool_id | VARCHAR | 池 ID |
+| mint_a_symbol | VARCHAR | 代幣 A 符號 |
+| mint_b_symbol | VARCHAR | 代幣 B 符號 |
+| price | DOUBLE | 當前價格 |
+| tvl | DOUBLE | 總鎖倉價值 |
+| fee_rate | DOUBLE | 手續費率 |
+| day_volume | DOUBLE | 24H 交易量 |
+| day_apr | DOUBLE | 24H APR |
+| day_fee_apr | DOUBLE | 24H 手續費 APR |
+| fetched_at | TIMESTAMP | 獲取時間 |
 
-```
-=== 應用程式啟動，DeribitInstrumentsRunner 已啟用 ===
-📅 排程設定：
-   🕐 每8小時執行：每天 0:00, 8:00, 16:00
-   🕐 每1小時執行：每小時的整點
-   🕐 每3分鐘執行：每小時的 0, 3, 6, 9... 分
+## 🎯 功能使用指南
 
-=== 開始執行 Deribit 工具列表查詢 (啟動時執行) ===
-正在呼叫 API: https://www.deribit.com/api/v2/public/get_instruments?currency=USDC&kind=option
-成功取得 150 個選擇權工具，正在篩選 SOL 基礎貨幣的工具:
-================================================================================
-SOL 工具 1: SOL_USDC-27JUN25-170-C
-  基礎貨幣: SOL
-  類型: CALL 選擇權
-  履約價: 170
-  到期時間: 2025/06/27 08:00:00
---------------------------------------------------
-...
-總計: 45 個 SOL 基礎貨幣的 USDC 選擇權工具
-
-🔄 開始逐一查詢每個 SOL 工具的訂單簿資料...
-
-📊 處理第 1/45 個工具: SOL_USDC-27JUN25-170-C
-=== 開始查詢 SOL_USDC-27JUN25-170-C 訂單簿資料 ===
-================================================================================
-📊 工具名稱: SOL_USDC-27JUN25-170-C
-================================================================================
-📈 狀態: open
-🕐 時間: 2025/06/01 17:05:38
-🔄 變更ID: 38951612955
---------------------------------------------------
-🔢 希臘字母和價格資訊:
---------------------------------------------------
-📊 Delta: 0.335750
-📊 Gamma: 0.011900
-📊 Vega: 0.148830
-📊 Theta: -0.215210
-📊 Rho: 0.032180
-
-💰 指數價格 (Index Price): 153.068700
-💰 標的價格 (Underlying Price): 153.068700
-💰 標記價格 (Mark Price): 6.132600
-
-📈 未平倉合約 (Open Interest): 3980.000000
-
-📊 標記隱含波動率 (Mark IV): 75.060000
-📊 買方隱含波動率 (Bid IV): 72.130000
-📊 賣方隱含波動率 (Ask IV): 78.180000
---------------------------------------------------
-
-💾 正在儲存資料到資料庫...
-✅ 資料已成功儲存到資料庫！記錄ID: 1
-📊 工具: SOL_USDC-27JUN25-170-C, 時間: 2025/06/01 17:05:38
-=== SOL_USDC-27JUN25-170-C 訂單簿查詢完成 ===
-⏱️  等待 1 秒後處理下一個工具...
-
-📊 處理第 2/45 個工具: SOL_USDC-28JUN25-180-P
-...
-```
-
-## 排程說明
-
-### Cron 表達式格式
-```
-秒 分 時 日 月 週
-```
-
-### 排程設定
-- **每8小時**：`0 0 */8 * * *` → 00:00, 08:00, 16:00
-- **每1小時**：`0 0 * * * *` → 每小時整點
-- **每3分鐘**：`0 */3 * * * *` → 每小時的 0, 3, 6, 9... 分
-
-## API 限制處理
-
-- 每秒最多一次 API 呼叫
-- 自動錯誤重試機制
-- 完整的異常處理和日誌記錄
-
-## 開發指南
-
-### 新增排程任務
-在 `DeribitInstrumentsRunner` 中新增方法：
+### Deribit 選擇權分析
 ```java
-@Scheduled(cron = "0 0 */6 * * *") // 每6小時
-public void scheduledTask6Hours() {
-    fetchInstruments("每6小時執行");
-}
-```
+// 系統會自動執行以下排程任務：
+// - 每8小時：完整工具列表掃描
+// - 每3分鐘：高頻市場資料更新
 
-### 查詢資料庫
-使用 `OptionDataRepository` 的內建方法：
-```java
-// 查詢特定工具
-List<OptionData> data = repository.findByInstrumentName("SOL_USDC-27JUN25-170-C");
+// 查詢特定工具的歷史資料
+List<OptionData> data = optionDataRepository.findByInstrumentName("SOL_USDC-27JUN25-170-C");
 
-// 查詢時間範圍
-List<OptionData> rangeData = repository.findByInstrumentNameAndCreatedAtBetween(
+// 查詢時間範圍內的資料
+List<OptionData> rangeData = optionDataRepository.findByInstrumentNameAndCreatedAtBetween(
     "SOL_USDC-27JUN25-170-C", startTime, endTime);
-
-// 查詢最新記錄
-List<OptionData> latest = repository.findAllOrderByCreatedAtDesc();
 ```
 
-## 故障排除
+### Raydium 池監控
+```java
+// 查詢特定池的歷史資料
+List<RaydiumV3PoolData> poolData = raydiumRepository.findByPoolIdOrderByFetchedAtDesc("8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj");
 
-### 常見問題
+// 查詢時間範圍內的池資料
+List<RaydiumV3PoolData> rangeData = raydiumRepository.findByPoolIdAndFetchedAtBetweenOrderByFetchedAtDesc(
+    poolId, startTime, endTime);
+```
+
+### CLMM Position 分析
+```java
+// 手動觸發 Position 分析
+@Autowired
+private CLMMPositionRunner positionRunner;
+
+// 分析單一 Position
+positionRunner.manualAnalyze("single", "68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o");
+
+// 批次分析
+positionRunner.manualAnalyze("batch", "id1,id2,id3");
+
+// 快速狀態檢查
+positionRunner.manualAnalyze("quick", null);
+
+// 生成摘要報告
+positionRunner.manualAnalyze("summary", null);
+```
+
+## ⚙️ 排程配置
+
+### Cron 表達式設定
+```java
+// Deribit 選擇權
+@Scheduled(cron = "0 0 */8 * * *")  // 每8小時：00:00, 08:00, 16:00
+@Scheduled(cron = "0 */3 * * * *")  // 每3分鐘
+
+// Raydium 池資訊
+@Scheduled(cron = "0 0 */8 * * *")  // 每8小時
+
+// CLMM Position 檢查
+@Scheduled(cron = "0 0 */8 * * *")  // 每8小時
+```
+
+## 🔧 CLMM Position 分析功能詳解
+
+### 支援的分析類型
+1. **單一 Position 分析**：深度分析特定 Position 的所有資訊
+2. **批次 Position 分析**：同時分析多個 Position 並比較
+3. **快速狀態檢查**：快速獲取 Position 的關鍵指標
+4. **摘要報告生成**：統計所有 Position 的總體表現
+
+### 分析指標
+- **位置價值**：Position 的當前美元價值
+- **TVL 佔比**：Position 在池中的佔比
+- **未領收益**：累積但尚未領取的手續費和獎勵
+- **價格範圍**：Position 的有效價格區間
+- **活躍狀態**：當前價格是否在有效範圍內
+
+### 區塊鏈數據整合
+- **實時 tick 數據**：直接從 Solana 節點讀取 Position 帳戶
+- **Token Extensions 支援**：完整解析 NFT 元數據
+- **多程序相容**：支援不同版本的 Raydium CLMM 程序
+
+## 🚨 故障排除
+
+### 常見問題與解決方案
 
 1. **資料庫連線失敗**
-   ```
-   檢查 PostgreSQL 是否運行
-   確認 application.properties 中的連線資訊
-   驗證使用者權限
-   ```
-
-2. **API 呼叫失敗**
-   ```
-   檢查網路連線
-   確認 Deribit API 可用性
-   查看 API 限制是否超出
+   ```bash
+   # 檢查 PostgreSQL 狀態
+   sudo systemctl status postgresql
+   
+   # 確認連線參數
+   psql -h localhost -p 5432 -U your_username -d solana_lp_db
    ```
 
-3. **排程未執行**
+2. **Solana 節點連接問題**
+   ```properties
+   # 使用公共 RPC 節點
+   solana.rpcUrl=https://api.mainnet-beta.solana.com
+   
+   # 或暫時停用區塊鏈數據
+   solana.enableBlockchainData=false
    ```
-   確認主應用程式有 @EnableScheduling 註解
-   檢查 cron 表達式語法
-   查看應用程式日誌
+
+3. **API 限制問題**
+   ```properties
+   # 調整重試設定
+   solana.maxRetries=3
+   solana.retryDelay=3000
+   ```
+
+4. **CLMM Position 404 錯誤**
+   ```bash
+   # 檢查 Position 是否仍然活躍
+   # 或使用有效的 Position ID
+   export CLMM_POSITION_ID=68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o
    ```
 
 ### 日誌設定
-在 `application.properties` 中調整日誌級別：
 ```properties
-# 顯示 SQL 查詢
+# 調整日誌級別
+logging.level.com.example.java_solana_lp_option=DEBUG
 logging.level.org.hibernate.SQL=DEBUG
 
-# 顯示參數綁定
-logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
-
-# 應用程式日誌
-logging.level.com.example.java_solana_lp_option=DEBUG
+# CLMM 分析詳細日誌
+logging.level.com.example.java_solana_lp_option.analyzer=TRACE
 ```
 
-## 貢獻指南
+## 📈 性能優化建議
+
+### 資料庫優化
+```sql
+-- 為查詢頻繁的欄位建立索引
+CREATE INDEX idx_option_instrument_time ON option_data(instrument_name, created_at);
+CREATE INDEX idx_pool_id_time ON raydium_v3_pool_data(pool_id, fetched_at);
+
+-- 定期清理舊資料（可選）
+DELETE FROM option_data WHERE created_at < NOW() - INTERVAL '30 days';
+```
+
+### API 呼叫優化
+```properties
+# 連線池設定
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+
+# 超時設定
+solana.connectTimeout=15000
+solana.readTimeout=30000
+```
+
+## 🛡️ 安全性考量
+
+### API 金鑰管理
+```bash
+# 使用環境變數儲存敏感資訊
+export DATABASE_PASSWORD=your_secure_password
+export SOLANA_RPC_URL=https://your-private-rpc-endpoint.com
+```
+
+### 資料庫安全
+```sql
+-- 限制資料庫使用者權限
+GRANT SELECT, INSERT, UPDATE ON option_data TO app_user;
+GRANT SELECT, INSERT, UPDATE ON raydium_v3_pool_data TO app_user;
+```
+
+## 📊 監控與警報
+
+### 應用程式健康檢查
+```properties
+# 啟用 Spring Boot Actuator
+management.endpoints.web.exposure.include=health,info,metrics
+management.endpoint.health.show-details=always
+```
+
+### 關鍵指標監控
+- 資料庫連接狀態
+- API 呼叫成功率
+- Solana 節點連接狀態
+- Position 分析成功率
+- 排程任務執行狀態
+
+## 🔄 版本更新記錄
+
+### v1.3.0 (最新)
+- ✨ 新增 CLMM Position 分析器
+- 🔗 整合 Solana 區塊鏈數據讀取
+- 📊 支援批次 Position 分析
+- 🎯 實時價格範圍監控
+- 💰 未領收益追蹤
+
+### v1.2.0
+- 🏊 新增 Raydium V3 池監控
+- 📈 APR 計算與追蹤
+- 🗄️ 池資料歷史儲存
+
+### v1.1.0
+- 🔄 選擇權資料自動排程收集
+- 📊 希臘字母資料儲存
+- ⏱️ 高頻市場資料更新
+
+### v1.0.0
+- 🚀 基礎應用程式架構
+- 💾 PostgreSQL 資料庫整合
+- 📡 Deribit API 整合
+
+## 🤝 貢獻指南
 
 1. Fork 專案
 2. 建立功能分支 (`git checkout -b feature/AmazingFeature`)
@@ -296,14 +401,40 @@ logging.level.com.example.java_solana_lp_option=DEBUG
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 開啟 Pull Request
 
-## 授權
+### 開發規範
+- 使用 Java 17 語法特性
+- 遵循 Spring Boot 最佳實踐
+- 添加適當的單元測試
+- 更新相關文檔
+
+## 📄 授權
 
 本專案採用 MIT 授權 - 詳見 [LICENSE](LICENSE) 檔案
 
-## 聯絡方式
+## 📞 聯絡方式
 
-如有問題或建議，請提交 Issue 或聯絡專案維護者。
+如有問題或建議，請：
+- 提交 GitHub Issue
+- 聯絡專案維護者
+- 查看 [Wiki](wiki) 獲取更多文檔
 
 ---
 
-**注意**：請確保遵守 Deribit API 的使用條款和限制。本應用程式僅供教育和研究目的使用。
+## 🎯 使用案例
+
+### DeFi 投資組合管理
+- 監控 Raydium 流動性池的表現
+- 追蹤 CLMM Position 的收益
+- 分析選擇權市場的波動率趨勢
+
+### 量化交易策略
+- 基於希臘字母的選擇權策略
+- 流動性挖礦收益優化
+- 跨協議套利機會識別
+
+### 風險管理
+- Position 價格範圍監控
+- 未領收益閾值警報
+- 市場波動率風險評估
+
+**注意**：請確保遵守相關 API 的使用條款和限制。本應用程式僅供教育和研究目的使用，投資決策請謹慎評估風險。
