@@ -17,7 +17,7 @@ import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-@Component
+//@Component
 public class RaydiumV3PoolInfoFetcher {
 
     private final RestTemplate restTemplate;
