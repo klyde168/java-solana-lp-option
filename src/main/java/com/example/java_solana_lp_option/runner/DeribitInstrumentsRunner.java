@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+//@Component
 @Order(1)
 public class DeribitInstrumentsRunner implements CommandLineRunner {
 
