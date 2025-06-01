@@ -114,6 +114,18 @@ public class SolanaService {
     }
     
     /**
+     * 檢查是否為 Raydium CLMM Program
+     */
+    private boolean isRaydiumClmmProgram(String programId) {
+        for (String raydiumProgramId : solanaConfig.getRaydiumClmmProgramIds()) {
+            if (raydiumProgramId.equals(programId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
      * 獲取 Token Extensions 帳戶資訊
      */
     public TokenExtensionsInfo getTokenExtensions(String mintAddress) {
@@ -167,18 +179,6 @@ public class SolanaService {
             System.err.printf("❌ 獲取 Token Extensions 失敗: %s%n", e.getMessage());
             return null;
         }
-    }
-    
-    /**
-     * 檢查是否為 Raydium CLMM Program
-     */
-    private boolean isRaydiumClmmProgram(String programId) {
-        for (String raydiumProgramId : solanaConfig.getRaydiumClmmProgramIds()) {
-            if (raydiumProgramId.equals(programId)) {
-                return true;
-            }
-        }
-        return false;
     }
     
     /**
@@ -269,18 +269,6 @@ public class SolanaService {
             System.err.printf("❌ 查找 CLMM Position 帳戶失敗: %s%n", e.getMessage());
             return createMockPositionAccount();
         }
-    }
-    
-    /**
-     * 檢查是否為 Raydium CLMM Program
-     */
-    private boolean isRaydiumClmmProgram(String programId) {
-        for (String raydiumProgramId : solanaConfig.getRaydiumClmmProgramIds()) {
-            if (raydiumProgramId.equals(programId)) {
-                return true;
-            }
-        }
-        return false;
     }
     
     /**
@@ -526,7 +514,7 @@ public class SolanaService {
         try {
             System.out.println("🔍 檢查 Solana 節點連接狀態...");
             
-            JsonNode health = callSolanaRPC("getHealth");
+            callSolanaRPC("getHealth");
             System.out.println("✅ Solana 節點連接正常");
             return true;
             

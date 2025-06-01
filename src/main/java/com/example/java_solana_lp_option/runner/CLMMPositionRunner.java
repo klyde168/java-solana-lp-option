@@ -19,10 +19,11 @@ public class CLMMPositionRunner implements CommandLineRunner {
     private final CLMMPositionAnalyzer analyzer;
     private final SolanaConfig solanaConfig;
     
-    // 預設的 CLMM Position NFT Mints (可以透過環境變數或配置覆蓋)
+    // 更新預設的 CLMM Position NFT Mints (使用有效的 Position)
     private static final List<String> DEFAULT_CLMM_POSITIONS = Arrays.asList(
-        "BSoUetj6UWvZFYrSnA9KsejAzQZWXUTfFCsB2EWk3LYh", // 預設 Position 1
-        "68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o"  // 預設 Position 2
+        "68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o", // 有效的 WSOL/USDC Position
+        "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM", // 另一個常見的 Position
+        "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"  // 第三個備用 Position
     );
     
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -51,7 +52,6 @@ public class CLMMPositionRunner implements CommandLineRunner {
         
         if (solanaConfig.isEnableBlockchainData()) {
             System.out.println("\n🔗 正在檢查 Solana 節點連接...");
-            // 這裡可以添加節點健康檢查，但為了避免阻塞啟動過程，我們在分析時再檢查
             System.out.println("   節點連接將在分析時進行驗證");
         } else {
             System.out.println("\n💡 提示: 如需使用實際區塊鏈數據，請設定 solana.enableBlockchainData=true");
@@ -146,7 +146,10 @@ public class CLMMPositionRunner implements CommandLineRunner {
         try {
             System.out.println("🔍 執行所有 Position 的快速狀態檢查...");
             
-            for (String positionId : DEFAULT_CLMM_POSITIONS) {
+            // 只檢查有效的 Position
+            List<String> validPositions = getValidPositions();
+            
+            for (String positionId : validPositions) {
                 analyzer.quickStatusCheck(positionId);
             }
             
@@ -156,6 +159,27 @@ public class CLMMPositionRunner implements CommandLineRunner {
         } catch (Exception e) {
             System.err.println("❌ 快速狀態檢查失敗: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 獲取有效的 Position 列表（過濾掉已知無效的）
+     */
+    private List<String> getValidPositions() {
+        List<String> validPositions = new ArrayList<>();
+        
+        for (String positionId : DEFAULT_CLMM_POSITIONS) {
+            // 過濾掉已知無效的 Position
+            if (!"BSoUetj6UWvZFYrSnA9KsejAzQZWXUTfFCsB2EWk3LYh".equals(positionId)) {
+                validPositions.add(positionId);
+            }
+        }
+        
+        // 如果所有預設 Position 都無效，至少保留一個已知有效的
+        if (validPositions.isEmpty()) {
+            validPositions.add("68Yz4qUkPPLHjcqpWraXQuLC7UoFUTrybohjEobnhB5o");
+        }
+        
+        return validPositions;
     }
     
     /**
@@ -171,7 +195,9 @@ public class CLMMPositionRunner implements CommandLineRunner {
             int successCount = 0;
             int failedCount = 0;
             
-            for (String positionId : DEFAULT_CLMM_POSITIONS) {
+            List<String> validPositions = getValidPositions();
+            
+            for (String positionId : validPositions) {
                 Map<String, Object> summary = analyzer.getPositionSummary(positionId);
                 
                 String status = (String) summary.get("status");
@@ -190,12 +216,12 @@ public class CLMMPositionRunner implements CommandLineRunner {
                     System.out.printf("✅ %s", tokenPair);
                     
                     if (usdValue != null) {
-                        System.out.printf(" | 價值: $%.2f", usdValue);
+                        System.out.printf(" | 價值: %s", formatCurrency(usdValue));
                         totalValue += usdValue;
                     }
                     
                     if (unclaimedFeesUSD != null) {
-                        System.out.printf(" | 未領收益: $%.2f", unclaimedFeesUSD);
+                        System.out.printf(" | 未領收益: %s", formatCurrency(unclaimedFeesUSD));
                         totalUnclaimedFees += unclaimedFeesUSD;
                     }
                     
@@ -212,12 +238,23 @@ public class CLMMPositionRunner implements CommandLineRunner {
             System.out.printf("📊 統計摘要:%n");
             System.out.printf("   成功分析: %d 個 Position%n", successCount);
             System.out.printf("   失敗: %d 個 Position%n", failedCount);
-            System.out.printf("   總價值: $%.2f%n", totalValue);
-            System.out.printf("   總未領收益: $%.2f%n", totalUnclaimedFees);
+            System.out.printf("   總價值: %s%n", formatCurrency(totalValue));
+            System.out.printf("   總未領收益: %s%n", formatCurrency(totalUnclaimedFees));
             
             if (totalValue > 0) {
                 double unclaimedPercentage = (totalUnclaimedFees / totalValue) * 100;
                 System.out.printf("   未領收益比例: %.2f%%%n", unclaimedPercentage);
+                
+                // 提供管理建議
+                if (unclaimedPercentage > 2.0) {
+                    System.out.println("\n💡 管理建議:");
+                    System.out.printf("   🚨 未領收益比例 %.2f%% 較高，建議考慮領取手續費%n", unclaimedPercentage);
+                } else if (totalUnclaimedFees > 50) {
+                    System.out.println("\n💡 管理建議:");
+                    System.out.printf("   ⚠️ 未領收益金額 %s 較大，可考慮定期領取%n", formatCurrency(totalUnclaimedFees));
+                } else {
+                    System.out.println("\n✅ Position 狀態良好，未領收益在合理範圍內");
+                }
             }
             
         } catch (Exception e) {
@@ -261,7 +298,7 @@ public class CLMMPositionRunner implements CommandLineRunner {
                         List<String> ids = Arrays.asList(positionId.split(","));
                         analyzer.analyzeBatchCLMMPositions(ids);
                     } else {
-                        analyzer.analyzeBatchCLMMPositions(DEFAULT_CLMM_POSITIONS);
+                        analyzer.analyzeBatchCLMMPositions(getValidPositions());
                     }
                     break;
                     
@@ -373,12 +410,12 @@ public class CLMMPositionRunner implements CommandLineRunner {
     }
     
     /**
-     * 獲取所有預設 Position 的狀態
+     * 獲取所有有效 Position 的狀態
      */
     public List<Map<String, Object>> getAllPositionStatus() {
         List<Map<String, Object>> results = new ArrayList<>();
         
-        for (String positionId : DEFAULT_CLMM_POSITIONS) {
+        for (String positionId : getValidPositions()) {
             try {
                 Map<String, Object> summary = analyzer.getPositionSummary(positionId);
                 results.add(summary);
