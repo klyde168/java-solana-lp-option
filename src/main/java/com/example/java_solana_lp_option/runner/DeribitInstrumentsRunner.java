@@ -40,7 +40,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
         System.out.println("   🕐 每1小時執行：每小時的整點");
         System.out.println("   🕐 每3分鐘執行：每小時的 0, 3, 6, 9... 分");
         
-        fetchInstruments("啟動時執行");
+        //fetchInstruments("啟動時執行");
     }
     
     @Scheduled(cron = "0 0 */8 * * *")
@@ -49,17 +49,17 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
         fetchInstruments("每8小時執行");
     }
     
-    @Scheduled(cron = "0 0 * * * *")
-    public void scheduledFetchInstruments1Hour() {
-        System.out.println("\n⏰ 1小時定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
-        fetchInstruments("每1小時執行");
-    }
+    // @Scheduled(cron = "0 0 * * * *")
+    // public void scheduledFetchInstruments1Hour() {
+    //     System.out.println("\n⏰ 1小時定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
+    //     fetchInstruments("每1小時執行");
+    // }
     
-    @Scheduled(cron = "0 */3 * * * *")
-    public void scheduledFetchInstruments3Minutes() {
-        System.out.println("\n⏰ 3分鐘定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
-        fetchInstruments("每3分鐘執行");
-    }
+    // @Scheduled(cron = "0 */3 * * * *")
+    // public void scheduledFetchInstruments3Minutes() {
+    //     System.out.println("\n⏰ 3分鐘定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
+    //     fetchInstruments("每3分鐘執行");
+    // }
     
     private void fetchInstruments(String trigger) {
         System.out.println("=== 開始執行 Deribit 工具列表查詢 (" + trigger + ") ===");
