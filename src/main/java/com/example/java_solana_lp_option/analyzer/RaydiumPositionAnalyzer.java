@@ -407,7 +407,7 @@ public class RaydiumPositionAnalyzer {
     
     // HTTP GET 請求
     public JsonNode httpGet(String url, String operationName) throws Exception {
-        System.out.printf("🌐 [%s] 正在從 %s 獲取數據...%n", operationName, url);
+        // System.out.printf("🌐 [%s] 正在從 %s 獲取數據...%n", operationName, url); // 移除此行
         
         try {
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -415,7 +415,7 @@ public class RaydiumPositionAnalyzer {
             if (response.getStatusCode().is2xxSuccessful()) {
                 String responseBody = response.getBody();
                 JsonNode jsonNode = objectMapper.readTree(responseBody);
-                System.out.printf("✅ [%s] 數據獲取成功!%n", operationName);
+                // System.out.printf("✅ [%s] 數據獲取成功!%n", operationName); // 移除此行
                 return jsonNode;
             } else {
                 throw new RuntimeException("HTTP 錯誤: " + response.getStatusCode());
@@ -451,7 +451,7 @@ public class RaydiumPositionAnalyzer {
                     String pairLpMint = getStringValue(pair, "lpMint");
                     
                     if (poolId.equals(ammId) || (lpMint != null && lpMint.equals(pairLpMint))) {
-                        System.out.println("✅ 從 V2 Main Pairs API 找到 AMM Pool 資訊");
+                        // System.out.println("✅ 從 V2 Main Pairs API 找到 AMM Pool 資訊"); // 如果需要此日誌，可以取消註解
                         return pair;
                     }
                 }
@@ -487,7 +487,7 @@ public class RaydiumPositionAnalyzer {
     // 獲取 AMM Pool 資訊
     public PoolInfo getAMMPoolInfo() {
         try {
-            System.out.printf("🔍 分析 Raydium AMM Pool: %s%n", RAYDIUM_AMM_POOL_ID);
+            // System.out.printf("🔍 分析 Raydium AMM Pool: %s%n", RAYDIUM_AMM_POOL_ID); // 移除此行
             
             // 並行獲取資料
             double wsolReserve = getVaultBalance(AMM_WSOL_VAULT, KNOWN_TOKENS_INFO.get(WSOL_MINT).getDecimals());
@@ -996,7 +996,7 @@ public class RaydiumPositionAnalyzer {
     
     // 分析 AMM Position
     public void analyzeAMMPosition(String userWallet) {
-        System.out.println("🎯 Raydium AMM Position Liquidity 完整分析");
+        // System.out.println("🎯 Raydium AMM Position Liquidity 完整分析"); // 移除此行
         PoolInfo poolData = getAMMPoolInfo();
         if (poolData == null) {
             System.out.println("❌ 無法獲取 AMM Pool 資訊");
@@ -1006,32 +1006,32 @@ public class RaydiumPositionAnalyzer {
         // 註解掉詳細 JSON 輸出，只顯示重要摘要
         // printFormattedJSON(poolData, "AMM Pool 詳細資訊");
         
-        // 顯示簡潔的摘要資訊
-        System.out.println("\n📊 === AMM Pool 摘要資訊 ===");
-        System.out.printf("Pool ID: %s%n", poolData.getPoolId());
-        System.out.printf("Pool 類型: %s%n", poolData.getPoolType());
-        System.out.printf("Base Token: %s (儲備: %.2f)%n", 
-                         poolData.getBaseToken().getSymbol(), 
-                         poolData.getBaseToken().getReserve());
-        System.out.printf("Quote Token: %s (儲備: %.2f)%n", 
-                         poolData.getQuoteToken().getSymbol(), 
-                         poolData.getQuoteToken().getReserve());
-        System.out.printf("當前價格: %.2f %s/%s%n", 
-                         poolData.getPoolStats().getPrice(),
-                         poolData.getQuoteToken().getSymbol(),
-                         poolData.getBaseToken().getSymbol());
-        System.out.printf("總鎖定價值 (TVL): $%.0f%n", poolData.getPoolStats().getTvl());
+        // 顯示簡潔的摘要資訊 - 以下皆移除
+        // System.out.println("\n📊 === AMM Pool 摘要資訊 ===");
+        // System.out.printf("Pool ID: %s%n", poolData.getPoolId());
+        // System.out.printf("Pool 類型: %s%n", poolData.getPoolType());
+        // System.out.printf("Base Token: %s (儲備: %.2f)%n", 
+        //                  poolData.getBaseToken().getSymbol(), 
+        //                  poolData.getBaseToken().getReserve());
+        // System.out.printf("Quote Token: %s (儲備: %.2f)%n", 
+        //                  poolData.getQuoteToken().getSymbol(), 
+        //                  poolData.getQuoteToken().getReserve());
+        // System.out.printf("當前價格: %.2f %s/%s%n", 
+        //                  poolData.getPoolStats().getPrice(),
+        //                  poolData.getQuoteToken().getSymbol(),
+        //                  poolData.getBaseToken().getSymbol());
+        // System.out.printf("總鎖定價值 (TVL): $%.0f%n", poolData.getPoolStats().getTvl());
         
-        if (poolData.getPoolStats().getApr() != null) {
-            System.out.printf("年化收益率 (APR): %.2f%%%n", poolData.getPoolStats().getApr());
-        }
-        if (poolData.getPoolStats().getVolume24h() != null) {
-            System.out.printf("24小時交易量: $%.0f%n", poolData.getPoolStats().getVolume24h());
-        }
-        System.out.println("=".repeat(50));
+        // if (poolData.getPoolStats().getApr() != null) {
+        //     System.out.printf("年化收益率 (APR): %.2f%%%n", poolData.getPoolStats().getApr());
+        // }
+        // if (poolData.getPoolStats().getVolume24h() != null) {
+        //     System.out.printf("24小時交易量: $%.0f%n", poolData.getPoolStats().getVolume24h());
+        // }
+        // System.out.println("=".repeat(50));
         
         if (userWallet != null && !userWallet.trim().isEmpty()) {
-            System.out.printf("👤 用戶錢包分析功能需要 Solana RPC 連接，目前僅顯示 Pool 資訊%n");
+            // System.out.printf("👤 用戶錢包分析功能需要 Solana RPC 連接，目前僅顯示 Pool 資訊%n"); // 如果需要用戶錢包相關日誌，可以取消註解此行
         }
     }
     

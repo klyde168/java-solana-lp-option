@@ -29,9 +29,9 @@ public class RaydiumPositionRunner implements CommandLineRunner {
         
         try {
             // 1. 分析 AMM Position
-            System.out.println("\n🔵 第一部分：AMM Pool 分析");
-            System.out.println("-".repeat(50));
-            analyzeAMM();
+            // System.out.println("\n🔵 第一部分：AMM Pool 分析"); // 移除此行
+            // System.out.println("-".repeat(50)); // 移除此行
+            // analyzeAMM();
             
             // 添加分隔線
             System.out.println("\n" + "=".repeat(80));
@@ -56,15 +56,15 @@ public class RaydiumPositionRunner implements CommandLineRunner {
      */
     private void analyzeAMM() {
         try {
-            System.out.println("🎯 開始執行 Raydium AMM Pool 分析...");
+            // System.out.println("🎯 開始執行 Raydium AMM Pool 分析..."); // 移除此行
             
             // 可以從環境變數獲取用戶錢包地址（可選）
             String userWallet = System.getenv("USER_WALLET");
             if (userWallet != null && !userWallet.trim().isEmpty()) {
-                System.out.printf("👤 將分析用戶錢包: %s%n", userWallet);
+                // System.out.printf("👤 將分析用戶錢包: %s%n", userWallet); // 如果需要用戶錢包相關日誌，可以取消註解此行
             } else {
-                System.out.println("💡 未提供用戶錢包地址，僅分析 Pool 基本資訊");
-                System.out.println("   如需用戶倉位分析，請設定環境變數 USER_WALLET");
+                // System.out.println("💡 未提供用戶錢包地址，僅分析 Pool 基本資訊"); // 移除此行
+                // System.out.println("   如需用戶倉位分析，請設定環境變數 USER_WALLET"); // 移除此行
             }
             
             analyzer.analyzeAMMPosition(userWallet);
