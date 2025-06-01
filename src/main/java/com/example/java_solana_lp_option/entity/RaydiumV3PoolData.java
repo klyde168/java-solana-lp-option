@@ -1,17 +1,28 @@
+// 檔案路徑: com/example/java_solana_lp_option/entity/RaydiumV3PoolData.java
 package com.example.java_solana_lp_option.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Index; // 引入 Index
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "raydium_v3_pool_data")
+// 添加索引以優化根據 pool_id 和 fetched_at 的查詢
+@Table(name = "raydium_v3_pool_data", indexes = {
+    @Index(name = "idx_pool_id", columnList = "pool_id"),
+    @Index(name = "idx_fetched_at", columnList = "fetched_at")
+})
 public class RaydiumV3PoolData {
 
     @Id
-    @Column(name = "pool_id", nullable = false, length = 100) // 池子ID，通常是字串，例如 Base58 編碼的地址
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // 使用自動生成的主鍵
+    private Long id;
+
+    @Column(name = "pool_id", nullable = false, length = 100) // 池子ID，不再是主鍵但仍然重要
     private String poolId;
 
     @Column(name = "mint_a_symbol", length = 20)
@@ -47,15 +58,23 @@ public class RaydiumV3PoolData {
     @Column(name = "day_fee_apr") // 儲存原始的百分比值，例如 24.72 (代表 24.72%)
     private Double dayFeeApr;
 
-    @Column(name = "fetched_at", nullable = false)
+    @Column(name = "fetched_at", nullable = false) // 這個欄位就是每筆紀錄的「建立時間」
     private LocalDateTime fetchedAt;
 
     // Constructors
     public RaydiumV3PoolData() {
-        this.fetchedAt = LocalDateTime.now();
+        this.fetchedAt = LocalDateTime.now(); // 預設設定擷取時間
     }
 
     // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
     public String getPoolId() {
         return poolId;
     }
@@ -163,7 +182,8 @@ public class RaydiumV3PoolData {
     @Override
     public String toString() {
         return "RaydiumV3PoolData{" +
-                "poolId='" + poolId + '\'' +
+                "id=" + id + // 新增 id
+                ", poolId='" + poolId + '\'' +
                 ", mintASymbol='" + mintASymbol + '\'' +
                 ", mintBSymbol='" + mintBSymbol + '\'' +
                 ", price=" + price +
