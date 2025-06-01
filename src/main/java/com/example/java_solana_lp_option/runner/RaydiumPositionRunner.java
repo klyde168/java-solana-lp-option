@@ -28,51 +28,18 @@ public class RaydiumPositionRunner implements CommandLineRunner {
         System.out.println("=".repeat(80));
         
         try {
-            // 1. 分析 AMM Position
-            // System.out.println("\n🔵 第一部分：AMM Pool 分析"); // 移除此行
-            // System.out.println("-".repeat(50)); // 移除此行
-            // analyzeAMM();
-            
-            // 添加分隔線
-            System.out.println("\n" + "=".repeat(80));
-            
-            // 2. 分析 CLMM Position
-            System.out.println("\n🟢 第二部分：CLMM 倉位分析");
+            // 分析 CLMM Position
+            System.out.println("\n🟢 CLMM 倉位分析");
             System.out.println("-".repeat(50));
             analyzeCLMM();
             
         } catch (Exception e) {
             System.err.println("❌ Raydium Position 分析過程中發生錯誤: " + e.getMessage());
-            // 移除 e.printStackTrace() 來減少不必要的堆疊追蹤輸出
         }
         
         System.out.println("\n" + "=".repeat(80));
         System.out.println("✅ === Raydium Position 分析器執行完成 ===");
         System.out.println("=".repeat(80));
-    }
-    
-    /**
-     * 分析 AMM Pool 資訊
-     */
-    private void analyzeAMM() {
-        try {
-            // System.out.println("🎯 開始執行 Raydium AMM Pool 分析..."); // 移除此行
-            
-            // 可以從環境變數獲取用戶錢包地址（可選）
-            String userWallet = System.getenv("USER_WALLET");
-            if (userWallet != null && !userWallet.trim().isEmpty()) {
-                // System.out.printf("👤 將分析用戶錢包: %s%n", userWallet); // 如果需要用戶錢包相關日誌，可以取消註解此行
-            } else {
-                // System.out.println("💡 未提供用戶錢包地址，僅分析 Pool 基本資訊"); // 移除此行
-                // System.out.println("   如需用戶倉位分析，請設定環境變數 USER_WALLET"); // 移除此行
-            }
-            
-            analyzer.analyzeAMMPosition(userWallet);
-            
-        } catch (Exception e) {
-            System.err.println("❌ AMM 分析失敗: " + e.getMessage());
-            // 只在除錯模式下顯示完整堆疊追蹤
-        }
     }
     
     /**
@@ -94,7 +61,6 @@ public class RaydiumPositionRunner implements CommandLineRunner {
             
         } catch (Exception e) {
             System.err.println("❌ CLMM 分析失敗: " + e.getMessage());
-            // 只在除錯模式下顯示完整堆疊追蹤
         }
     }
     
@@ -129,7 +95,6 @@ public class RaydiumPositionRunner implements CommandLineRunner {
             
         } catch (Exception e) {
             System.err.printf("❌ 手動 %s 分析失敗: %s%n", type.toUpperCase(), e.getMessage());
-            // 只在除錯模式下顯示完整堆疊追蹤
         }
     }
     
@@ -146,6 +111,27 @@ public class RaydiumPositionRunner implements CommandLineRunner {
             analyzer.analyzeCLMMPosition(positionId);
         } catch (Exception e) {
             System.err.printf("❌ 快速 CLMM 分析失敗: %s%n", e.getMessage());
+        }
+    }
+    
+    /**
+     * 分析 AMM Pool 資訊（保留但不在 run 方法中自動調用）
+     */
+    public void analyzeAMM(String userWallet) {
+        try {
+            System.out.println("🎯 開始執行 Raydium AMM Pool 分析...");
+            
+            if (userWallet != null && !userWallet.trim().isEmpty()) {
+                System.out.printf("👤 將分析用戶錢包: %s%n", userWallet);
+            } else {
+                System.out.println("💡 未提供用戶錢包地址，僅分析 Pool 基本資訊");
+                System.out.println("   如需用戶倉位分析，請設定環境變數 USER_WALLET");
+            }
+            
+            analyzer.analyzeAMMPosition(userWallet);
+            
+        } catch (Exception e) {
+            System.err.println("❌ AMM 分析失敗: " + e.getMessage());
         }
     }
 }

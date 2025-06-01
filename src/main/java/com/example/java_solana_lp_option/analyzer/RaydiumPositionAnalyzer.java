@@ -578,7 +578,7 @@ public class RaydiumPositionAnalyzer {
             if (name == null && knownInfo.getName() != null) name = knownInfo.getName();
         }
         
-        if (decimals == null) decimals = 0;
+        //if (decimals == null) decimals = 0;
         if (symbol == null) symbol = "未知";
         
         return new ParsedCLMMTokenInfo(
