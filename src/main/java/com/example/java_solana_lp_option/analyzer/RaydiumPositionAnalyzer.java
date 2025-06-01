@@ -1,8 +1,9 @@
-package com.example.java_solana_lp_option.analyzer;
+package com.example.java_solana_lp_option.analyzer; // Correct package declaration
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.*;
@@ -27,6 +28,8 @@ public class RaydiumPositionAnalyzer {
     
     private static final String CLMM_POSITION_API_URL_BASE = "https://dynamic-ipfs.raydium.io/clmm/position?id=";
     private static final String RAYDIUM_V2_MAIN_PAIRS_API = "https://api.raydium.io/v2/main/pairs";
+
+    private static final int API_TIMEOUT_MS = 15000; // 15 秒超時
     
     // 已知代幣資訊
     private static final Map<String, TokenInfo> KNOWN_TOKENS_INFO = new HashMap<>();
@@ -39,8 +42,12 @@ public class RaydiumPositionAnalyzer {
     }
     
     public RaydiumPositionAnalyzer() {
-        this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
+        // 設定 RestTemplate 的超時時間
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(API_TIMEOUT_MS);
+        factory.setReadTimeout(API_TIMEOUT_MS);
+        this.restTemplate = new RestTemplate(factory);
     }
     
     // 靜態內部類別定義
@@ -259,7 +266,7 @@ public class RaydiumPositionAnalyzer {
         private ParsedCLMMTokenInfo token0;
         private ParsedCLMMTokenInfo token1;
         private List<ParsedCLMMRewardInfo> rewards;
-        private Object status;
+        private Object status; // 可以是 String 或 Integer
         private Double usdValue;
         private Double unclaimedFeesUSD;
         private Double unclaimedRewardsUSD;
@@ -382,15 +389,18 @@ public class RaydiumPositionAnalyzer {
     }
     
     // 安全取得字串值
-    private String getStringValue(JsonNode node, String fieldName) {
+    private String getStringValue(JsonNode node, String fieldName, String defaultValue) {
         JsonNode field = node.get(fieldName);
-        return field != null ? field.asText() : "N/A";
+        return (field != null && !field.isNull() && field.isTextual()) ? field.asText() : defaultValue;
+    }
+     private String getStringValue(JsonNode node, String fieldName) {
+        return getStringValue(node, fieldName, "N/A");
     }
     
     // 安全取得數值
     private double getDoubleValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
-        if (field != null && !field.isNull()) {
+        if (field != null && !field.isNull() && field.isNumber()) {
             return field.asDouble();
         }
         return 0.0;
@@ -399,7 +409,7 @@ public class RaydiumPositionAnalyzer {
     // 安全取得整數值
     private Integer getIntegerValue(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
-        if (field != null && !field.isNull()) {
+        if (field != null && !field.isNull() && field.isInt()) {
             return field.asInt();
         }
         return null;
@@ -407,7 +417,7 @@ public class RaydiumPositionAnalyzer {
     
     // HTTP GET 請求
     public JsonNode httpGet(String url, String operationName) throws Exception {
-        // System.out.printf("🌐 [%s] 正在從 %s 獲取數據...%n", operationName, url); // 移除此行
+        // System.out.printf("🌐 [%s] 正在從 %s 獲取數據...%n", operationName, url); 
         
         try {
             ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
@@ -415,14 +425,15 @@ public class RaydiumPositionAnalyzer {
             if (response.getStatusCode().is2xxSuccessful()) {
                 String responseBody = response.getBody();
                 JsonNode jsonNode = objectMapper.readTree(responseBody);
-                // System.out.printf("✅ [%s] 數據獲取成功!%n", operationName); // 移除此行
+                // System.out.printf("✅ [%s] 數據獲取成功!%n", operationName); 
                 return jsonNode;
             } else {
+                System.err.printf("❌ [%s] HTTP 錯誤: %s, URL: %s%n", operationName, response.getStatusCode(), url);
                 throw new RuntimeException("HTTP 錯誤: " + response.getStatusCode());
             }
             
         } catch (Exception e) {
-            System.err.printf("❌ [%s] 請求失敗: %s%n", operationName, e.getMessage());
+            System.err.printf("❌ [%s] 請求失敗: %s, URL: %s%n", operationName, e.getMessage(), url);
             throw e;
         }
     }
@@ -442,7 +453,6 @@ public class RaydiumPositionAnalyzer {
     
     // 獲取 Raydium Pool 從 API
     private JsonNode getRaydiumPoolFromAPI(String poolId, String lpMint) {
-        // System.out.printf("ℹ️ [getRaydiumPoolFromAPI] 嘗試從 API 獲取 AMM Pool %s 的額外資訊...%n", poolId);
         try {
             JsonNode mainPairs = httpGet(RAYDIUM_V2_MAIN_PAIRS_API, "Raydium V2 Main Pairs (AMM)");
             if (mainPairs != null && mainPairs.isArray()) {
@@ -451,35 +461,30 @@ public class RaydiumPositionAnalyzer {
                     String pairLpMint = getStringValue(pair, "lpMint");
                     
                     if (poolId.equals(ammId) || (lpMint != null && lpMint.equals(pairLpMint))) {
-                        // System.out.println("✅ 從 V2 Main Pairs API 找到 AMM Pool 資訊"); // 如果需要此日誌，可以取消註解
                         return pair;
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.printf("   ⚠️ V2 Main Pairs API 查詢失敗: %s%n", e.getMessage());
+            // 錯誤已在 httpGet 中記錄
         }
         return null;
     }
     
-    // 模擬獲取 Vault 餘額 (由於無法直接連接 Solana RPC，這裡返回模擬數據)
+    // 模擬獲取 Vault 餘額
     private double getVaultBalance(String vaultAddress, int decimals) {
-        // System.out.printf("🔍 [模擬] 查詢 Vault 餘額: %s...%n", vaultAddress.substring(0, 8));
-        
-        // 模擬數據 - 在實際應用中需要連接 Solana RPC
         if (vaultAddress.equals(AMM_WSOL_VAULT)) {
-            return 1000000.0; // 模擬 WSOL 餘額
+            return 1000000.0; 
         } else if (vaultAddress.equals(AMM_USDC_VAULT)) {
-            return 150000000.0; // 模擬 USDC 餘額
+            return 150000000.0; 
         }
         return 0.0;
     }
     
     // 模擬獲取 AMM LP Token 供應量
     private Map<String, Object> getAMMLPTokenSupply() {
-        // System.out.println("🔍 [模擬] 查詢 AMM LP Token 供應量...");
         Map<String, Object> result = new HashMap<>();
-        result.put("amount", 5000000.0); // 模擬總供應量
+        result.put("amount", 5000000.0); 
         result.put("decimals", 6);
         return result;
     }
@@ -487,49 +492,42 @@ public class RaydiumPositionAnalyzer {
     // 獲取 AMM Pool 資訊
     public PoolInfo getAMMPoolInfo() {
         try {
-            // System.out.printf("🔍 分析 Raydium AMM Pool: %s%n", RAYDIUM_AMM_POOL_ID); // 移除此行
-            
-            // 並行獲取資料
             double wsolReserve = getVaultBalance(AMM_WSOL_VAULT, KNOWN_TOKENS_INFO.get(WSOL_MINT).getDecimals());
             double usdcReserve = getVaultBalance(AMM_USDC_VAULT, KNOWN_TOKENS_INFO.get(USDC_MINT).getDecimals());
-            Map<String, Object> lpTokenData = getAMMLPTokenSupply();
+            Map<String, Object> lpTokenDataMap = getAMMLPTokenSupply(); // 更名以避免與類名衝突
             JsonNode apiPoolInfo = getRaydiumPoolFromAPI(RAYDIUM_AMM_POOL_ID, AMM_LP_TOKEN_MINT);
             
             double price = wsolReserve > 0 ? usdcReserve / wsolReserve : 
                           (apiPoolInfo != null ? getDoubleValue(apiPoolInfo, "price") : 0);
-            double tvl = apiPoolInfo != null ? getDoubleValue(apiPoolInfo, "tvl") : (usdcReserve * 2);
+            double tvl = apiPoolInfo != null ? getDoubleValue(apiPoolInfo, "tvl") : (usdcReserve * 2); // 簡化 TVL 計算
             
             PoolInfo poolInfo = new PoolInfo();
             poolInfo.setPoolId(RAYDIUM_AMM_POOL_ID);
             poolInfo.setPoolType("Raydium AMM V4");
             
-            // 設定 Base Token (WSOL)
             TokenInfo wsolInfo = KNOWN_TOKENS_INFO.get(WSOL_MINT);
             PoolInfo.TokenData baseToken = new PoolInfo.TokenData(
                 WSOL_MINT, wsolInfo.getSymbol(), wsolInfo.getDecimals(), AMM_WSOL_VAULT, wsolReserve);
             poolInfo.setBaseToken(baseToken);
             
-            // 設定 Quote Token (USDC)
             TokenInfo usdcInfo = KNOWN_TOKENS_INFO.get(USDC_MINT);
             PoolInfo.TokenData quoteToken = new PoolInfo.TokenData(
                 USDC_MINT, usdcInfo.getSymbol(), usdcInfo.getDecimals(), AMM_USDC_VAULT, usdcReserve);
             poolInfo.setQuoteToken(quoteToken);
             
-            // 設定 LP Token
             PoolInfo.LpTokenData lpToken = new PoolInfo.LpTokenData(
                 AMM_LP_TOKEN_MINT, 
-                (Double) lpTokenData.get("amount"), 
-                (Integer) lpTokenData.get("decimals"));
+                (Double) lpTokenDataMap.get("amount"), 
+                (Integer) lpTokenDataMap.get("decimals"));
             poolInfo.setLpToken(lpToken);
             
-            // 設定 Pool Stats
             PoolInfo.PoolStats poolStats = new PoolInfo.PoolStats();
             poolStats.setTvl(tvl);
             poolStats.setPrice(price);
             if (apiPoolInfo != null) {
                 poolStats.setVolume24h(getDoubleValue(apiPoolInfo, "volume24h"));
                 JsonNode aprNode = apiPoolInfo.get("apr");
-                if (aprNode != null) {
+                if (aprNode != null && aprNode.has("day")) { // 確保 apr.day 存在
                     poolStats.setApr(getDoubleValue(aprNode, "day"));
                 }
             }
@@ -544,19 +542,17 @@ public class RaydiumPositionAnalyzer {
     }
     
     // CLMM Position 相關方法
-    
-    // 獲取 CLMM 資料
     private JsonNode fetchCLMMData(String positionNftMint) {
         String apiUrl = CLMM_POSITION_API_URL_BASE + positionNftMint;
         try {
-            return httpGet(apiUrl, String.format("CLMM 倉位 %s... 查詢", positionNftMint.substring(0, 8)));
+            // System.out.printf("🚀 開始獲取 CLMM 倉位數據: %s%n", positionNftMint); // 移至 analyzeCLMMPosition
+            return httpGet(apiUrl, String.format("CLMM 倉位 %s", positionNftMint.substring(0, Math.min(8, positionNftMint.length()))));
         } catch (Exception error) {
-            System.err.printf("❌ 獲取 CLMM 倉位 %s 數據失敗: %s%n", positionNftMint, error.getMessage());
+            // 錯誤已在 httpGet 中記錄
             return null;
         }
     }
     
-    // 解析 CLMM Token 資訊
     private ParsedCLMMTokenInfo parseCLMMTokenInfo(
             String mint,
             Object rawAmount,
@@ -571,14 +567,14 @@ public class RaydiumPositionAnalyzer {
         Integer decimals = apiProvidedDecimals;
         String name = apiProvidedName;
         
-        if (symbol == null || decimals == null) {
+        if (symbol == null || decimals == null || "N/A".equals(symbol)) { // 檢查 N/A
             TokenInfo knownInfo = getKnownTokenInfo(mint);
-            if (symbol == null) symbol = knownInfo.getSymbol();
+            if (symbol == null || "N/A".equals(symbol)) symbol = knownInfo.getSymbol();
             if (decimals == null) decimals = knownInfo.getDecimals();
-            if (name == null && knownInfo.getName() != null) name = knownInfo.getName();
+            if (name == null || "N/A".equals(name)) name = knownInfo.getName();
         }
         
-        //if (decimals == null) decimals = 0;
+        if (decimals == null) decimals = 0; // 避免 NullPointerException
         if (symbol == null) symbol = "未知";
         
         return new ParsedCLMMTokenInfo(
@@ -593,277 +589,170 @@ public class RaydiumPositionAnalyzer {
         );
     }
     
-    // 解析 CLMM 資料
     private ParsedCLMMPositionInfo parseCLMMData(JsonNode rawData, String positionIdFromInput) {
-        JsonNode poolInfo = rawData.get("poolInfo");
-        JsonNode positionInfo = rawData.get("positionInfo");
+        ParsedCLMMPositionInfo result = new ParsedCLMMPositionInfo();
+        result.setId(positionIdFromInput);
+
+        if (rawData == null) {
+            System.err.printf("❌ CLMM 倉位 %s 的原始數據為 null，無法解析。%n", positionIdFromInput);
+            result.setPoolId("獲取失敗");
+            result.setStatus("獲取失敗");
+            // 其他欄位將保持其預設的 null 或 0 值
+            return result;
+        }
+
+        JsonNode poolInfoNode = rawData.get("poolInfo"); // 更名以避免與類名衝突
+        JsonNode positionInfoNode = rawData.get("positionInfo"); // 更名
         
-        // 獲取 mint 地址
-        String mintA_address = null;
-        String mintA_symbol = null;
+        result.setPoolId(poolInfoNode != null ? getStringValue(poolInfoNode, "id", "獲取失敗") : getStringValue(rawData, "poolId", "獲取失敗"));
+        result.setPoolName(poolInfoNode != null ? getStringValue(poolInfoNode, "name") : getStringValue(rawData, "poolName"));
+        result.setOwner(getStringValue(rawData, "owner"));
+
+        // 解析 Tokens (mintA, mintB)
+        String mintA_address = null, mintA_symbol = null, mintA_name = null;
         Integer mintA_decimals = null;
-        String mintA_name = null;
-        
-        if (poolInfo != null) {
-            JsonNode mintA = poolInfo.get("mintA");
-            if (mintA != null) {
-                mintA_address = getStringValue(mintA, "address");
-                mintA_symbol = getStringValue(mintA, "symbol");
-                mintA_decimals = getIntegerValue(mintA, "decimals");
-                mintA_name = getStringValue(mintA, "name");
-            }
+        if (poolInfoNode != null && poolInfoNode.has("mintA")) {
+            JsonNode mintANode = poolInfoNode.get("mintA");
+            mintA_address = getStringValue(mintANode, "address");
+            mintA_symbol = getStringValue(mintANode, "symbol");
+            mintA_decimals = getIntegerValue(mintANode, "decimals");
+            mintA_name = getStringValue(mintANode, "name");
+        } else {
+             mintA_address = getStringValue(rawData, "mint0");
         }
-        if (mintA_address == null) {
-            mintA_address = getStringValue(rawData, "mint0");
-        }
-        
-        String mintB_address = null;
-        String mintB_symbol = null;
+
+        String mintB_address = null, mintB_symbol = null, mintB_name = null;
         Integer mintB_decimals = null;
-        String mintB_name = null;
-        
-        if (poolInfo != null) {
-            JsonNode mintB = poolInfo.get("mintB");
-            if (mintB != null) {
-                mintB_address = getStringValue(mintB, "address");
-                mintB_symbol = getStringValue(mintB, "symbol");
-                mintB_decimals = getIntegerValue(mintB, "decimals");
-                mintB_name = getStringValue(mintB, "name");
-            }
-        }
-        if (mintB_address == null) {
+        if (poolInfoNode != null && poolInfoNode.has("mintB")) {
+            JsonNode mintBNode = poolInfoNode.get("mintB");
+            mintB_address = getStringValue(mintBNode, "address");
+            mintB_symbol = getStringValue(mintBNode, "symbol");
+            mintB_decimals = getIntegerValue(mintBNode, "decimals");
+            mintB_name = getStringValue(mintBNode, "name");
+        } else {
             mintB_address = getStringValue(rawData, "mint1");
         }
         
-        // 獲取 amount 值
-        Object amountA_value = null;
-        Object amountB_value = null;
-        Object feeOwedA_value = null;
-        Object feeOwedB_value = null;
-        
-        if (positionInfo != null) {
-            JsonNode amountA = positionInfo.get("amountA");
-            if (amountA != null) amountA_value = amountA.isTextual() ? amountA.asText() : amountA.asDouble();
-            
-            JsonNode amountB = positionInfo.get("amountB");
-            if (amountB != null) amountB_value = amountB.isTextual() ? amountB.asText() : amountB.asDouble();
-            
-            JsonNode unclaimedFee = positionInfo.get("unclaimedFee");
-            if (unclaimedFee != null) {
-                JsonNode unclaimedAmountA = unclaimedFee.get("amountA");
-                if (unclaimedAmountA != null) feeOwedA_value = unclaimedAmountA.isTextual() ? unclaimedAmountA.asText() : unclaimedAmountA.asDouble();
-                
-                JsonNode unclaimedAmountB = unclaimedFee.get("amountB");
-                if (unclaimedAmountB != null) feeOwedB_value = unclaimedAmountB.isTextual() ? unclaimedAmountB.asText() : unclaimedAmountB.asDouble();
+        // 解析 Amounts 和 Fees
+        Object amountA_value = null, amountB_value = null, feeOwedA_value = null, feeOwedB_value = null;
+        if (positionInfoNode != null) {
+            amountA_value = positionInfoNode.has("amountA") ? (positionInfoNode.get("amountA").isTextual() ? positionInfoNode.get("amountA").asText() : positionInfoNode.get("amountA").asDouble()) : null;
+            amountB_value = positionInfoNode.has("amountB") ? (positionInfoNode.get("amountB").isTextual() ? positionInfoNode.get("amountB").asText() : positionInfoNode.get("amountB").asDouble()) : null;
+            if (positionInfoNode.has("unclaimedFee")) {
+                JsonNode unclaimedFeeNode = positionInfoNode.get("unclaimedFee");
+                feeOwedA_value = unclaimedFeeNode.has("amountA") ? (unclaimedFeeNode.get("amountA").isTextual() ? unclaimedFeeNode.get("amountA").asText() : unclaimedFeeNode.get("amountA").asDouble()) : null;
+                feeOwedB_value = unclaimedFeeNode.has("amountB") ? (unclaimedFeeNode.get("amountB").isTextual() ? unclaimedFeeNode.get("amountB").asText() : unclaimedFeeNode.get("amountB").asDouble()) : null;
+                result.setUnclaimedFeesUSD(unclaimedFeeNode.has("usdFeeValue") ? getDoubleValue(unclaimedFeeNode, "usdFeeValue") : null);
+                result.setUnclaimedRewardsUSD(unclaimedFeeNode.has("usdRewardValue") ? getDoubleValue(unclaimedFeeNode, "usdRewardValue") : null);
+                result.setTotalUnclaimedUSD(unclaimedFeeNode.has("usdValue") ? getDoubleValue(unclaimedFeeNode, "usdValue") : null);
             }
+        } else { // Fallback if positionInfo is not present
+            amountA_value = rawData.has("amount0") ? (rawData.get("amount0").isTextual() ? rawData.get("amount0").asText() : rawData.get("amount0").asDouble()) : null;
+            amountB_value = rawData.has("amount1") ? (rawData.get("amount1").isTextual() ? rawData.get("amount1").asText() : rawData.get("amount1").asDouble()) : null;
+            feeOwedA_value = rawData.has("feeOwed0") ? (rawData.get("feeOwed0").isTextual() ? rawData.get("feeOwed0").asText() : rawData.get("feeOwed0").asDouble()) : null;
+            feeOwedB_value = rawData.has("feeOwed1") ? (rawData.get("feeOwed1").isTextual() ? rawData.get("feeOwed1").asText() : rawData.get("feeOwed1").asDouble()) : null;
         }
+
+        result.setToken0(parseCLMMTokenInfo(mintA_address, amountA_value, feeOwedA_value, mintA_symbol, mintA_decimals, mintA_name));
+        result.setToken1(parseCLMMTokenInfo(mintB_address, amountB_value, feeOwedB_value, mintB_symbol, mintB_decimals, mintB_name));
         
-        if (amountA_value == null) {
-            JsonNode amount0 = rawData.get("amount0");
-            if (amount0 != null) amountA_value = amount0.isTextual() ? amount0.asText() : amount0.asDouble();
-        }
-        if (amountB_value == null) {
-            JsonNode amount1 = rawData.get("amount1");
-            if (amount1 != null) amountB_value = amount1.isTextual() ? amount1.asText() : amount1.asDouble();
-        }
-        if (feeOwedA_value == null) {
-            JsonNode feeOwed0 = rawData.get("feeOwed0");
-            if (feeOwed0 != null) feeOwedA_value = feeOwed0.isTextual() ? feeOwed0.asText() : feeOwed0.asDouble();
-        }
-        if (feeOwedB_value == null) {
-            JsonNode feeOwed1 = rawData.get("feeOwed1");
-            if (feeOwed1 != null) feeOwedB_value = feeOwed1.isTextual() ? feeOwed1.asText() : feeOwed1.asDouble();
-        }
-        
-        ParsedCLMMTokenInfo token0 = parseCLMMTokenInfo(mintA_address, amountA_value, feeOwedA_value, mintA_symbol, mintA_decimals, mintA_name);
-        ParsedCLMMTokenInfo token1 = parseCLMMTokenInfo(mintB_address, amountB_value, feeOwedB_value, mintB_symbol, mintB_decimals, mintB_name);
-        
-        // 獲取費用和獎勵資訊
-        Double unclaimedFeesUSD = null;
-        Double unclaimedRewardsUSD = null;
-        Double totalUnclaimedUSD = null;
-        
-        if (positionInfo != null) {
-            JsonNode unclaimedFee = positionInfo.get("unclaimedFee");
-            if (unclaimedFee != null) {
-                JsonNode usdFeeValue = unclaimedFee.get("usdFeeValue");
-                if (usdFeeValue != null && !usdFeeValue.isNull()) {
-                    unclaimedFeesUSD = usdFeeValue.asDouble();
-                }
-                
-                JsonNode usdRewardValue = unclaimedFee.get("usdRewardValue");
-                if (usdRewardValue != null && !usdRewardValue.isNull()) {
-                    unclaimedRewardsUSD = usdRewardValue.asDouble();
-                }
-                
-                JsonNode usdValue = unclaimedFee.get("usdValue");
-                if (usdValue != null && !usdValue.isNull()) {
-                    totalUnclaimedUSD = usdValue.asDouble();
-                }
-            }
-        }
-        
-        // 解析獎勵資訊
+        // 解析 Rewards
         List<ParsedCLMMRewardInfo> rewards = new ArrayList<>();
-        
-        if (poolInfo != null && positionInfo != null) {
-            JsonNode rewardDefaultInfos = poolInfo.get("rewardDefaultInfos");
-            JsonNode unclaimedFee = positionInfo.get("unclaimedFee");
-            
-            if (rewardDefaultInfos != null && rewardDefaultInfos.isArray() && 
-                unclaimedFee != null) {
-                JsonNode rewardArray = unclaimedFee.get("reward");
-                if (rewardArray != null && rewardArray.isArray()) {
-                    
-                    for (int i = 0; i < rewardDefaultInfos.size() && i < rewardArray.size(); i++) {
-                        JsonNode rewardMeta = rewardDefaultInfos.get(i);
-                        JsonNode rewardAmount = rewardArray.get(i);
-                        
-                        if (rewardMeta != null && rewardAmount != null) {
-                            JsonNode mint = rewardMeta.get("mint");
-                            if (mint != null) {
-                                String rewardMintAddress = getStringValue(mint, "address");
-                                String rewardSymbol = getStringValue(mint, "symbol");
-                                String rewardName = getStringValue(mint, "name");
-                                Integer rewardDecimals = getIntegerValue(mint, "decimals");
-                                
-                                TokenInfo knownInfo = getKnownTokenInfo(rewardMintAddress);
-                                if (rewardDecimals == null) rewardDecimals = knownInfo.getDecimals();
-                                if (rewardDecimals == 0) rewardDecimals = 6; // 預設值
-                                
-                                Object rewardAmountValue = rewardAmount.isTextual() ? rewardAmount.asText() : rewardAmount.asDouble();
-                                
-                                ParsedCLMMRewardInfo rewardInfo = new ParsedCLMMRewardInfo();
-                                rewardInfo.setMint(rewardMintAddress);
-                                rewardInfo.setSymbol(rewardSymbol != null && !rewardSymbol.equals("N/A") ? rewardSymbol : knownInfo.getSymbol());
-                                rewardInfo.setName(rewardName != null && !rewardName.equals("N/A") ? rewardName : knownInfo.getName());
-                                rewardInfo.setDecimals(rewardDecimals);
-                                rewardInfo.setPendingRewardFormatted(formatBigNumber(rewardAmountValue, rewardDecimals, 8));
-                                rewardInfo.setPendingRewardRaw(String.valueOf(rewardAmountValue));
-                                
-                                // 如果只有一個獎勵，使用總獎勵 USD 值
-                                if (rewardDefaultInfos.size() == 1 && unclaimedRewardsUSD != null) {
-                                    rewardInfo.setValueUSD(String.format("%.4f", unclaimedRewardsUSD));
-                                }
-                                
-                                rewards.add(rewardInfo);
-                            }
+        if (poolInfoNode != null && poolInfoNode.has("rewardDefaultInfos") && positionInfoNode != null && positionInfoNode.has("unclaimedFee")) {
+            JsonNode rewardDefaultInfos = poolInfoNode.get("rewardDefaultInfos");
+            JsonNode rewardArray = positionInfoNode.get("unclaimedFee").get("reward");
+            if (rewardDefaultInfos.isArray() && rewardArray != null && rewardArray.isArray()) {
+                for (int i = 0; i < rewardDefaultInfos.size() && i < rewardArray.size(); i++) {
+                    JsonNode rewardMeta = rewardDefaultInfos.get(i);
+                    JsonNode rewardAmountNode = rewardArray.get(i); // 更名
+                    if (rewardMeta != null && rewardMeta.has("mint") && rewardAmountNode != null) {
+                        JsonNode mintNode = rewardMeta.get("mint"); // 更名
+                        ParsedCLMMRewardInfo rewardInfo = new ParsedCLMMRewardInfo();
+                        rewardInfo.setMint(getStringValue(mintNode, "address"));
+                        rewardInfo.setSymbol(getStringValue(mintNode, "symbol"));
+                        rewardInfo.setName(getStringValue(mintNode, "name"));
+                        Integer rDecimals = getIntegerValue(mintNode, "decimals");
+                        rewardInfo.setDecimals(rDecimals != null ? rDecimals : getKnownTokenInfo(rewardInfo.getMint()).getDecimals());
+                        Object rewardAmountValue = rewardAmountNode.isTextual() ? rewardAmountNode.asText() : rewardAmountNode.asDouble();
+                        rewardInfo.setPendingRewardFormatted(formatBigNumber(rewardAmountValue, rewardInfo.getDecimals(), 8));
+                        rewardInfo.setPendingRewardRaw(String.valueOf(rewardAmountValue));
+                        if (rewardDefaultInfos.size() == 1 && result.getUnclaimedRewardsUSD() != null) {
+                             rewardInfo.setValueUSD(String.format("%.4f", result.getUnclaimedRewardsUSD()));
                         }
+                        rewards.add(rewardInfo);
                     }
                 }
             }
+        } else if (rawData.has("rewardInfos") && rawData.get("rewardInfos").isArray()) { // Fallback
+             JsonNode rewardInfos = rawData.get("rewardInfos");
+             for (JsonNode rawReward : rewardInfos) {
+                ParsedCLMMRewardInfo rewardInfo = new ParsedCLMMRewardInfo();
+                rewardInfo.setMint(getStringValue(rawReward, "rewardMint", getStringValue(rawReward, "mint")));
+                TokenInfo knownInfo = getKnownTokenInfo(rewardInfo.getMint());
+                Integer rDecimals = getIntegerValue(rawReward, "tokenDecimals");
+                rewardInfo.setDecimals(rDecimals != null ? rDecimals : knownInfo.getDecimals());
+                rewardInfo.setSymbol(knownInfo.getSymbol());
+                rewardInfo.setName(knownInfo.getName());
+                String pendingReward = getStringValue(rawReward, "pendingReward");
+                rewardInfo.setPendingRewardFormatted(formatBigNumber(pendingReward, rewardInfo.getDecimals(), 8));
+                rewardInfo.setPendingRewardRaw(pendingReward);
+                rewardInfo.setPrice(rawReward.has("rewardPrice") ? getDoubleValue(rawReward, "rewardPrice") : null);
+                 if (rewardInfo.getPrice() != null) {
+                    try {
+                        double amount = Double.parseDouble(rewardInfo.getPendingRewardFormatted());
+                        rewardInfo.setValueUSD(String.format("%.4f", amount * rewardInfo.getPrice()));
+                    } catch (NumberFormatException e) { /*忽略*/ }
+                }
+                rewards.add(rewardInfo);
+             }
+        }
+        result.setRewards(rewards);
+
+        // Tick, Liquidity, Status, USD Value, TVL Percentage
+        result.setTickLower(getIntegerValue(rawData, "tickLower"));
+        result.setTickUpper(getIntegerValue(rawData, "tickUpper"));
+        result.setLiquidityRaw(getStringValue(rawData, "liquidity", null)); // null if not found
+
+        JsonNode statusNode = rawData.get("status");
+        if (statusNode != null && !statusNode.isNull()) {
+            result.setStatus(statusNode.isTextual() ? statusNode.asText() : (statusNode.isInt() ? statusNode.asInt() : "格式未知"));
         } else {
-            // 備用：直接從 rewardInfos 讀取
-            JsonNode rewardInfos = rawData.get("rewardInfos");
-            if (rewardInfos != null && rewardInfos.isArray()) {
-                for (JsonNode rawReward : rewardInfos) {
-                    String rewardMint = getStringValue(rawReward, "rewardMint");
-                    if (rewardMint.equals("N/A")) {
-                        rewardMint = getStringValue(rawReward, "mint");
-                    }
-                    
-                    TokenInfo knownInfo = getKnownTokenInfo(rewardMint);
-                    Integer rewardDecimals = getIntegerValue(rawReward, "tokenDecimals");
-                    if (rewardDecimals == null) rewardDecimals = knownInfo.getDecimals();
-                    if (rewardDecimals == 0) rewardDecimals = 6;
-                    
-                    String pendingReward = getStringValue(rawReward, "pendingReward");
-                    Double rewardPrice = null;
-                    JsonNode priceNode = rawReward.get("rewardPrice");
-                    if (priceNode != null && !priceNode.isNull()) {
-                        rewardPrice = priceNode.asDouble();
-                    }
-                    
-                    ParsedCLMMRewardInfo rewardInfo = new ParsedCLMMRewardInfo();
-                    rewardInfo.setMint(rewardMint);
-                    rewardInfo.setSymbol(knownInfo.getSymbol());
-                    rewardInfo.setName(knownInfo.getName());
-                    rewardInfo.setDecimals(rewardDecimals);
-                    rewardInfo.setPendingRewardFormatted(formatBigNumber(pendingReward, rewardDecimals, 8));
-                    rewardInfo.setPendingRewardRaw(pendingReward);
-                    rewardInfo.setPrice(rewardPrice);
-                    
-                    if (rewardPrice != null) {
-                        try {
-                            double amount = Double.parseDouble(formatBigNumber(pendingReward, rewardDecimals, 8));
-                            double valueUSD = amount * rewardPrice;
-                            rewardInfo.setValueUSD(String.format("%.4f", valueUSD));
-                        } catch (NumberFormatException e) {
-                            // 忽略轉換錯誤
-                        }
-                    }
-                    
-                    rewards.add(rewardInfo);
-                }
-            }
+            result.setStatus("獲取失敗");
         }
         
-        // 獲取其他屬性
-        Integer tickLower = getIntegerValue(rawData, "tickLower");
-        Integer tickUpper = getIntegerValue(rawData, "tickUpper");
-        String liquidity = getStringValue(rawData, "liquidity");
-        
-        // 從 attributes 獲取額外資訊
+        // 從 attributes 獲取額外資訊 (如果主要路徑未提供)
         JsonNode attributes = rawData.get("attributes");
         if (attributes != null && attributes.isArray()) {
             for (JsonNode attr : attributes) {
                 String traitType = getStringValue(attr, "trait_type");
-                if ("tickLowerIndex".equals(traitType) || "tickLower".equals(traitType)) {
-                    tickLower = getIntegerValue(attr, "value");
-                } else if ("tickUpperIndex".equals(traitType) || "tickUpper".equals(traitType)) {
-                    tickUpper = getIntegerValue(attr, "value");
-                } else if ("liquidity".equals(traitType)) {
-                    liquidity = getStringValue(attr, "value");
+                if (result.getTickLower() == null && ("tickLowerIndex".equals(traitType) || "tickLower".equals(traitType))) {
+                    result.setTickLower(getIntegerValue(attr, "value"));
+                }
+                if (result.getTickUpper() == null && ("tickUpperIndex".equals(traitType) || "tickUpper".equals(traitType))) {
+                     result.setTickUpper(getIntegerValue(attr, "value"));
+                }
+                if (result.getLiquidityRaw() == null && "liquidity".equals(traitType)) {
+                    result.setLiquidityRaw(getStringValue(attr, "value"));
                 }
             }
         }
-        
-        // 建構回傳物件
-        ParsedCLMMPositionInfo result = new ParsedCLMMPositionInfo();
-        result.setId(positionIdFromInput);
-        result.setPoolId(poolInfo != null ? getStringValue(poolInfo, "id") : getStringValue(rawData, "poolId"));
-        result.setPoolName(poolInfo != null ? getStringValue(poolInfo, "name") : getStringValue(rawData, "poolName"));
-        result.setOwner(getStringValue(rawData, "owner"));
-        result.setTickLower(tickLower);
-        result.setTickUpper(tickUpper);
+
+        if (positionInfoNode != null) {
+            result.setUsdValue(positionInfoNode.has("usdValue") ? getDoubleValue(positionInfoNode, "usdValue") : null);
+            result.setTvlPercentage(positionInfoNode.has("tvlPercentage") ? getDoubleValue(positionInfoNode, "tvlPercentage") : null);
+        }
         
         // 價格格式化
-        String priceLower = getStringValue(rawData, "priceLower");
-        String priceUpper = getStringValue(rawData, "priceUpper");
-        int quoteTokenDecimalsForPrice = token1 != null ? token1.getDecimals() : 6;
-        
-        if (!priceLower.equals("N/A")) {
-            result.setPriceLowerFormatted(formatBigNumber(priceLower, quoteTokenDecimalsForPrice, 6));
+        String priceLowerStr = getStringValue(rawData, "priceLower", null);
+        String priceUpperStr = getStringValue(rawData, "priceUpper", null);
+        int quoteTokenDecimalsForPrice = result.getToken1() != null ? result.getToken1().getDecimals() : 6;
+
+        if (priceLowerStr != null && !priceLowerStr.equals("N/A")) {
+            result.setPriceLowerFormatted(formatBigNumber(priceLowerStr, quoteTokenDecimalsForPrice, 6));
         }
-        if (!priceUpper.equals("N/A")) {
-            result.setPriceUpperFormatted(formatBigNumber(priceUpper, quoteTokenDecimalsForPrice, 6));
+        if (priceUpperStr != null && !priceUpperStr.equals("N/A")) {
+            result.setPriceUpperFormatted(formatBigNumber(priceUpperStr, quoteTokenDecimalsForPrice, 6));
         }
-        
-        result.setLiquidityRaw(liquidity.equals("N/A") ? null : liquidity);
-        result.setToken0(token0);
-        result.setToken1(token1);
-        result.setRewards(rewards);
-        
-        JsonNode statusNode = rawData.get("status");
-        if (statusNode != null) {
-            result.setStatus(statusNode.isTextual() ? statusNode.asText() : statusNode.asInt());
-        }
-        
-        if (positionInfo != null) {
-            JsonNode usdValueNode = positionInfo.get("usdValue");
-            if (usdValueNode != null && !usdValueNode.isNull()) {
-                result.setUsdValue(usdValueNode.asDouble());
-            }
-            
-            JsonNode tvlPercentageNode = positionInfo.get("tvlPercentage");
-            if (tvlPercentageNode != null && !tvlPercentageNode.isNull()) {
-                result.setTvlPercentage(tvlPercentageNode.asDouble());
-            }
-        }
-        
-        result.setUnclaimedFeesUSD(unclaimedFeesUSD);
-        result.setUnclaimedRewardsUSD(unclaimedRewardsUSD);
-        result.setTotalUnclaimedUSD(totalUnclaimedUSD);
         
         return result;
     }
@@ -871,8 +760,8 @@ public class RaydiumPositionAnalyzer {
     // 顯示 CLMM Position 資訊
     public void displayCLMMPosition(ParsedCLMMPositionInfo parsedInfo) {
         System.out.println("\n✨ === CLMM 倉位詳細資訊 (中文) === ✨");
-        System.out.printf("倉位 ID (NFT Mint): %s%n", parsedInfo.getId() != null ? parsedInfo.getId() : "未知");
-        System.out.printf("所屬池 ID: %s%n", parsedInfo.getPoolId() != null ? parsedInfo.getPoolId() : "未知");
+        System.out.printf("倉位 ID (NFT Mint): %s%n", parsedInfo.getId() != null ? parsedInfo.getId() : "獲取失敗");
+        System.out.printf("所屬池 ID: %s%n", parsedInfo.getPoolId() != null ? parsedInfo.getPoolId() : "獲取失敗");
         
         if (parsedInfo.getPoolName() != null && !parsedInfo.getPoolName().equals("N/A")) {
             System.out.printf("池子名稱: %s%n", parsedInfo.getPoolName());
@@ -882,21 +771,21 @@ public class RaydiumPositionAnalyzer {
         }
         
         System.out.println("\n--- 倉位狀態與範圍 ---");
-        System.out.printf("  狀態: %s%n", parsedInfo.getStatus() != null ? parsedInfo.getStatus() : "未知");
+        System.out.printf("  狀態: %s%n", parsedInfo.getStatus() != null ? parsedInfo.getStatus().toString() : "獲取失敗");
         System.out.printf("  Tick 範圍: %s 至 %s%n", 
-                         parsedInfo.getTickLower() != null ? parsedInfo.getTickLower() : "未知",
-                         parsedInfo.getTickUpper() != null ? parsedInfo.getTickUpper() : "未知");
+                         parsedInfo.getTickLower() != null ? parsedInfo.getTickLower() : "獲取失敗",
+                         parsedInfo.getTickUpper() != null ? parsedInfo.getTickUpper() : "獲取失敗");
         
         if (parsedInfo.getPriceLowerFormatted() != null && parsedInfo.getPriceUpperFormatted() != null) {
-            String baseSymbol = parsedInfo.getToken0() != null ? parsedInfo.getToken0().getSymbol() : "Token0";
-            String quoteSymbol = parsedInfo.getToken1() != null ? parsedInfo.getToken1().getSymbol() : "Token1";
+            String baseSymbol = (parsedInfo.getToken0() != null && parsedInfo.getToken0().getSymbol() != null) ? parsedInfo.getToken0().getSymbol() : "Token0";
+            String quoteSymbol = (parsedInfo.getToken1() != null && parsedInfo.getToken1().getSymbol() != null) ? parsedInfo.getToken1().getSymbol() : "Token1";
             System.out.printf("  價格下限 (近似): %s %s / %s%n", parsedInfo.getPriceLowerFormatted(), quoteSymbol, baseSymbol);
             System.out.printf("  價格上限 (近似): %s %s / %s%n", parsedInfo.getPriceUpperFormatted(), quoteSymbol, baseSymbol);
         } else {
-            System.out.println("  價格範圍: 未知 (API未提供priceLower/priceUpper)");
+            System.out.println("  價格範圍: 獲取失敗 (API未提供有效 priceLower/priceUpper 或解析失敗)");
         }
         
-        System.out.printf("  流動性 (原始值): %s%n", parsedInfo.getLiquidityRaw() != null ? parsedInfo.getLiquidityRaw() : "未知");
+        System.out.printf("  流動性 (原始值): %s%n", parsedInfo.getLiquidityRaw() != null ? parsedInfo.getLiquidityRaw() : "獲取失敗");
         
         if (parsedInfo.getTvlPercentage() != null) {
             System.out.printf("  池佔比 (TVL Percentage): %.6f%%%n", parsedInfo.getTvlPercentage());
@@ -909,26 +798,26 @@ public class RaydiumPositionAnalyzer {
         if (parsedInfo.getToken0() != null) {
             ParsedCLMMTokenInfo token0 = parsedInfo.getToken0();
             System.out.printf("%n--- 代幣 0 (%s - %s) ---%n", 
-                             token0.getSymbol(), 
-                             token0.getName() != null ? token0.getName() : token0.getMint());
-            System.out.printf("  估計數量: %s%n", token0.getAmountFormatted());
-            System.out.printf("  未領手續費: %s%n", token0.getFeeOwedFormatted());
+                             token0.getSymbol() != null ? token0.getSymbol() : "未知符號", 
+                             token0.getName() != null ? token0.getName() : (token0.getMint() != null ? token0.getMint() : "未知 Mint"));
+            System.out.printf("  估計數量: %s%n", token0.getAmountFormatted() != null ? token0.getAmountFormatted() : "獲取失敗");
+            System.out.printf("  未領手續費: %s%n", token0.getFeeOwedFormatted() != null ? token0.getFeeOwedFormatted() : "獲取失敗");
         } else {
             System.out.println("\n--- 代幣 0 ---");
-            System.out.println("  資訊未知");
+            System.out.println("  資訊獲取失敗");
         }
         
         // Token 1 資訊
         if (parsedInfo.getToken1() != null) {
             ParsedCLMMTokenInfo token1 = parsedInfo.getToken1();
             System.out.printf("%n--- 代幣 1 (%s - %s) ---%n", 
-                             token1.getSymbol(), 
-                             token1.getName() != null ? token1.getName() : token1.getMint());
-            System.out.printf("  估計數量: %s%n", token1.getAmountFormatted());
-            System.out.printf("  未領手續費: %s%n", token1.getFeeOwedFormatted());
+                             token1.getSymbol() != null ? token1.getSymbol() : "未知符號", 
+                             token1.getName() != null ? token1.getName() : (token1.getMint() != null ? token1.getMint() : "未知 Mint"));
+            System.out.printf("  估計數量: %s%n", token1.getAmountFormatted() != null ? token1.getAmountFormatted() : "獲取失敗");
+            System.out.printf("  未領手續費: %s%n", token1.getFeeOwedFormatted() != null ? token1.getFeeOwedFormatted() : "獲取失敗");
         } else {
             System.out.println("\n--- 代幣 1 ---");
-            System.out.println("  資訊未知");
+            System.out.println("  資訊獲取失敗");
         }
         
         // 未領取總收益
@@ -946,11 +835,11 @@ public class RaydiumPositionAnalyzer {
                 ParsedCLMMRewardInfo reward = parsedInfo.getRewards().get(i);
                 System.out.printf("  獎勵 %d: %s (%s)%n", 
                                  i + 1, 
-                                 reward.getSymbol(), 
-                                 reward.getName() != null ? reward.getName() : reward.getMint());
-                System.out.printf("    待領取數量: %s%n", reward.getPendingRewardFormatted());
+                                 reward.getSymbol() != null ? reward.getSymbol() : "未知符號", 
+                                 reward.getName() != null ? reward.getName() : (reward.getMint() != null ? reward.getMint() : "未知 Mint"));
+                System.out.printf("    待領取數量: %s%n", reward.getPendingRewardFormatted() != null ? reward.getPendingRewardFormatted() : "獲取失敗");
                 if (reward.getPrice() != null) {
-                    System.out.printf("    參考價格: %s USD / %s%n", reward.getPrice(), reward.getSymbol());
+                    System.out.printf("    參考價格: %s USD / %s%n", reward.getPrice(), reward.getSymbol() != null ? reward.getSymbol() : "未知符號");
                 }
                 if (reward.getValueUSD() != null) {
                     System.out.printf("    估計價值: $%s USD%n", reward.getValueUSD());
@@ -960,7 +849,7 @@ public class RaydiumPositionAnalyzer {
                 System.out.printf("  獎勵總美元價值: $%.2f%n", parsedInfo.getUnclaimedRewardsUSD());
             }
         } else {
-            System.out.println("🏆 獎勵資訊: 無。");
+            System.out.println("🏆 獎勵資訊: 無或獲取失敗。");
         }
         
         if (parsedInfo.getTotalUnclaimedUSD() != null) {
@@ -971,21 +860,21 @@ public class RaydiumPositionAnalyzer {
         
         // 指定輸出 (用戶請求日誌)
         System.out.println("\n--- 指定輸出 (用戶請求日誌) ---");
-        String token0Symbol = parsedInfo.getToken0() != null ? parsedInfo.getToken0().getSymbol() : "Token0";
-        String token1Symbol = parsedInfo.getToken1() != null ? parsedInfo.getToken1().getSymbol() : "Token1";
+        String token0Symbol = (parsedInfo.getToken0() != null && parsedInfo.getToken0().getSymbol() != null) ? parsedInfo.getToken0().getSymbol() : "Token0";
+        String token1Symbol = (parsedInfo.getToken1() != null && parsedInfo.getToken1().getSymbol() != null) ? parsedInfo.getToken1().getSymbol() : "Token1";
         
         System.out.printf("池佔比 (TVL Percentage): %s%n", 
                          parsedInfo.getTvlPercentage() != null ? String.format("%.6f%%", parsedInfo.getTvlPercentage()) : "N/A");
         System.out.printf("倉位總美元價值 (USD Value): %s%n", 
                          parsedInfo.getUsdValue() != null ? String.format("$%.2f", parsedInfo.getUsdValue()) : "N/A");
         System.out.printf("%s 數量: %s%n", token0Symbol, 
-                         parsedInfo.getToken0() != null ? parsedInfo.getToken0().getAmountFormatted() : "N/A");
+                         (parsedInfo.getToken0() != null && parsedInfo.getToken0().getAmountFormatted() != null) ? parsedInfo.getToken0().getAmountFormatted() : "N/A");
         System.out.printf("%s 數量: %s%n", token1Symbol, 
-                         parsedInfo.getToken1() != null ? parsedInfo.getToken1().getAmountFormatted() : "N/A");
+                         (parsedInfo.getToken1() != null && parsedInfo.getToken1().getAmountFormatted() != null) ? parsedInfo.getToken1().getAmountFormatted() : "N/A");
         System.out.printf("未領取 %s 手續費: %s%n", token0Symbol, 
-                         parsedInfo.getToken0() != null ? parsedInfo.getToken0().getFeeOwedFormatted() : "N/A");
+                         (parsedInfo.getToken0() != null && parsedInfo.getToken0().getFeeOwedFormatted() != null) ? parsedInfo.getToken0().getFeeOwedFormatted() : "N/A");
         System.out.printf("未領取 %s 手續費: %s%n", token1Symbol, 
-                         parsedInfo.getToken1() != null ? parsedInfo.getToken1().getFeeOwedFormatted() : "N/A");
+                         (parsedInfo.getToken1() != null && parsedInfo.getToken1().getFeeOwedFormatted() != null) ? parsedInfo.getToken1().getFeeOwedFormatted() : "N/A");
         System.out.printf("手續費總美元價值 (USD Fee Value): %s%n", 
                          parsedInfo.getUnclaimedFeesUSD() != null ? String.format("$%.2f", parsedInfo.getUnclaimedFeesUSD()) : "N/A");
         System.out.printf("未領取總收益美元價值 (Unclaimed Total USD Value): %s%n", 
@@ -994,60 +883,19 @@ public class RaydiumPositionAnalyzer {
         System.out.println("=".repeat(70));
     }
     
-    // 分析 AMM Position
-    public void analyzeAMMPosition(String userWallet) {
-        // System.out.println("🎯 Raydium AMM Position Liquidity 完整分析"); // 移除此行
+    public void analyzeAMMPosition() { 
         PoolInfo poolData = getAMMPoolInfo();
         if (poolData == null) {
-            System.out.println("❌ 無法獲取 AMM Pool 資訊");
+            // System.out.println("❌ 無法獲取 AMM Pool 資訊"); // 保持簡潔，錯誤已在 getAMMPoolInfo 記錄
             return;
-        }
-        
-        // 註解掉詳細 JSON 輸出，只顯示重要摘要
-        // printFormattedJSON(poolData, "AMM Pool 詳細資訊");
-        
-        // 顯示簡潔的摘要資訊 - 以下皆移除
-        // System.out.println("\n📊 === AMM Pool 摘要資訊 ===");
-        // System.out.printf("Pool ID: %s%n", poolData.getPoolId());
-        // System.out.printf("Pool 類型: %s%n", poolData.getPoolType());
-        // System.out.printf("Base Token: %s (儲備: %.2f)%n", 
-        //                  poolData.getBaseToken().getSymbol(), 
-        //                  poolData.getBaseToken().getReserve());
-        // System.out.printf("Quote Token: %s (儲備: %.2f)%n", 
-        //                  poolData.getQuoteToken().getSymbol(), 
-        //                  poolData.getQuoteToken().getReserve());
-        // System.out.printf("當前價格: %.2f %s/%s%n", 
-        //                  poolData.getPoolStats().getPrice(),
-        //                  poolData.getQuoteToken().getSymbol(),
-        //                  poolData.getBaseToken().getSymbol());
-        // System.out.printf("總鎖定價值 (TVL): $%.0f%n", poolData.getPoolStats().getTvl());
-        
-        // if (poolData.getPoolStats().getApr() != null) {
-        //     System.out.printf("年化收益率 (APR): %.2f%%%n", poolData.getPoolStats().getApr());
-        // }
-        // if (poolData.getPoolStats().getVolume24h() != null) {
-        //     System.out.printf("24小時交易量: $%.0f%n", poolData.getPoolStats().getVolume24h());
-        // }
-        // System.out.println("=".repeat(50));
-        
-        if (userWallet != null && !userWallet.trim().isEmpty()) {
-            // System.out.printf("👤 用戶錢包分析功能需要 Solana RPC 連接，目前僅顯示 Pool 資訊%n"); // 如果需要用戶錢包相關日誌，可以取消註解此行
         }
     }
     
-    // 分析 CLMM Position
     public void analyzeCLMMPosition(String positionNftMint) {
         System.out.printf("🚀 開始分析 CLMM 倉位: %s%n", positionNftMint);
         JsonNode rawData = fetchCLMMData(positionNftMint);
-        if (rawData != null) {
-            ParsedCLMMPositionInfo parsedInfo = parseCLMMData(rawData, positionNftMint);
-            displayCLMMPosition(parsedInfo);
-        } else {
-            System.out.printf("❌ 未能獲取或解析 CLMM 倉位 %s 的數據。%n", positionNftMint);
-            ParsedCLMMPositionInfo fallbackInfo = new ParsedCLMMPositionInfo();
-            fallbackInfo.setId(positionNftMint);
-            fallbackInfo.setPoolId("獲取失敗");
-            displayCLMMPosition(fallbackInfo);
-        }
+        // rawData 可能為 null，parseCLMMData 內部已處理此情況
+        ParsedCLMMPositionInfo parsedInfo = parseCLMMData(rawData, positionNftMint);
+        displayCLMMPosition(parsedInfo);
     }
 }

@@ -28,8 +28,16 @@ public class RaydiumPositionRunner implements CommandLineRunner {
         System.out.println("=".repeat(80));
         
         try {
-            // 分析 CLMM Position
-            System.out.println("\n🟢 CLMM 倉位分析");
+            // 1. 分析 AMM Position
+            // System.out.println("\n🔵 第一部分：AMM Pool 分析"); // 已移除
+            // System.out.println("-".repeat(50)); // 已移除
+            // analyzeAMM();
+            
+            // 添加分隔線
+            System.out.println("\n" + "=".repeat(80));
+            
+            // 2. 分析 CLMM Position
+            System.out.println("\n🟢 第二部分：CLMM 倉位分析");
             System.out.println("-".repeat(50));
             analyzeCLMM();
             
@@ -43,11 +51,26 @@ public class RaydiumPositionRunner implements CommandLineRunner {
     }
     
     /**
+     * 分析 AMM Pool 資訊
+     */
+    private void analyzeAMM() {
+        try {
+            // System.out.println("🎯 開始執行 Raydium AMM Pool 分析..."); // 已移除
+            
+            // userWallet 相關的獲取和日誌已移除
+            
+            analyzer.analyzeAMMPosition(); // Corrected: No arguments passed
+            
+        } catch (Exception e) {
+            System.err.println("❌ AMM 分析失敗: " + e.getMessage());
+        }
+    }
+    
+    /**
      * 分析 CLMM Position 資訊
      */
     private void analyzeCLMM() {
         try {
-            // 可以從環境變數獲取 CLMM Position ID，否則使用預設值
             String clmmPositionId = System.getenv("CLMM_POSITION_ID");
             if (clmmPositionId == null || clmmPositionId.trim().isEmpty()) {
                 clmmPositionId = DEFAULT_CLMM_POSITION_NFT_MINT;
@@ -74,7 +97,7 @@ public class RaydiumPositionRunner implements CommandLineRunner {
             switch (type.toLowerCase()) {
                 case "amm":
                     System.out.println("📊 執行 AMM 分析...");
-                    analyzer.analyzeAMMPosition(identifier);
+                    analyzer.analyzeAMMPosition(); // Corrected: No arguments passed, identifier is ignored for AMM
                     break;
                     
                 case "clmm":
@@ -111,27 +134,6 @@ public class RaydiumPositionRunner implements CommandLineRunner {
             analyzer.analyzeCLMMPosition(positionId);
         } catch (Exception e) {
             System.err.printf("❌ 快速 CLMM 分析失敗: %s%n", e.getMessage());
-        }
-    }
-    
-    /**
-     * 分析 AMM Pool 資訊（保留但不在 run 方法中自動調用）
-     */
-    public void analyzeAMM(String userWallet) {
-        try {
-            System.out.println("🎯 開始執行 Raydium AMM Pool 分析...");
-            
-            if (userWallet != null && !userWallet.trim().isEmpty()) {
-                System.out.printf("👤 將分析用戶錢包: %s%n", userWallet);
-            } else {
-                System.out.println("💡 未提供用戶錢包地址，僅分析 Pool 基本資訊");
-                System.out.println("   如需用戶倉位分析，請設定環境變數 USER_WALLET");
-            }
-            
-            analyzer.analyzeAMMPosition(userWallet);
-            
-        } catch (Exception e) {
-            System.err.println("❌ AMM 分析失敗: " + e.getMessage());
         }
     }
 }
