@@ -5,7 +5,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.core.annotation.Order;
 
-@Component
+//@Component
 @Order(3) // 在其他 Runner 之後執行
 public class RaydiumPositionRunner implements CommandLineRunner {
 
