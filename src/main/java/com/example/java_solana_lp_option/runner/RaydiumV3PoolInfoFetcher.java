@@ -1,7 +1,10 @@
 package com.example.java_solana_lp_option.runner;
 
+import com.example.java_solana_lp_option.entity.RaydiumV3PoolData; // 新增導入
+import com.example.java_solana_lp_option.repository.RaydiumV3PoolDataRepository; // 新增導入
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired; // 確保 Autowired 被導入
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -19,24 +22,31 @@ public class RaydiumV3PoolInfoFetcher {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final RaydiumV3PoolDataRepository raydiumV3PoolDataRepository; // 新增 Repository
     private static final String API_URL = "https://api-v3.raydium.io/pools/info/ids?ids=8sLbNZoA1cfnvMJLPfp98ZLAnFSYCFApfJKMbiXNLwxj";
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int API_TIMEOUT_MS = 15000; // 15 秒超時
 
-    public RaydiumV3PoolInfoFetcher() {
+    @Autowired // 添加 Autowired 以進行依賴注入
+    public RaydiumV3PoolInfoFetcher(RaydiumV3PoolDataRepository raydiumV3PoolDataRepository) {
         this.objectMapper = new ObjectMapper();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(API_TIMEOUT_MS);
         factory.setReadTimeout(API_TIMEOUT_MS);
         this.restTemplate = new RestTemplate(factory);
-        fetchAndDisplayPoolInfo();
+        this.raydiumV3PoolDataRepository = raydiumV3PoolDataRepository; // 初始化 Repository
+        // 應用程式啟動時執行一次獲取和顯示，以及儲存
+        fetchAndProcessPoolInfo();
     }
 
     @Scheduled(cron = "0 0 */8 * * *") // 每8小時執行一次 (例如 00:00, 08:00, 16:00)
-    // @Scheduled(fixedRate = 1000 * 60 * 1) // 測試用：每1分鐘執行一次
-    public void fetchAndDisplayPoolInfo() {
+    public void scheduledFetchAndProcessPoolInfo() {
+        fetchAndProcessPoolInfo();
+    }
+
+    public void fetchAndProcessPoolInfo() {
         System.out.println("================================================================================");
-        System.out.printf("🚀 [%s] 開始執行 Raydium V3 Pool 資訊獲取任務...%n", LocalDateTime.now().format(formatter));
+        System.out.printf("🚀 [%s] 開始執行 Raydium V3 Pool 資訊獲取與儲存任務...%n", LocalDateTime.now().format(formatter));
         System.out.println("API URL: " + API_URL);
         System.out.println("================================================================================");
 
@@ -50,16 +60,15 @@ public class RaydiumV3PoolInfoFetcher {
                     JsonNode poolsNode = rootNode.get("data");
 
                     if (poolsNode.isArray() && !poolsNode.isEmpty()) {
-                        // 我們只處理第一個池子的資訊，因為API URL中只有一個ID
-                        JsonNode poolInfo = poolsNode.get(0);
-                        displayPoolDetails(poolInfo);
+                        JsonNode poolInfoNode = poolsNode.get(0); // API URL中只有一個ID，所以取第一個
+                        displayPoolDetails(poolInfoNode); // 保留顯示邏輯
+                        savePoolData(poolInfoNode); // 新增儲存邏輯
                     } else {
                         System.err.println("❌ API 回應中的 'data' 陣列為空或無效。");
                     }
                 } else {
                     System.err.println("❌ API 回應格式不符預期，或請求未成功，或缺少 'data' 欄位。");
                     System.err.println("初步回應內容: " + (response.getBody().length() > 300 ? response.getBody().substring(0, 300) + "..." : response.getBody()));
-
                 }
             } else {
                 System.err.printf("❌ API 請求失敗，狀態碼: %s%n", response.getStatusCode());
@@ -72,8 +81,46 @@ public class RaydiumV3PoolInfoFetcher {
             e.printStackTrace();
         }
         System.out.println("================================================================================");
-        System.out.printf("✅ [%s] Raydium V3 Pool 資訊獲取任務執行完畢。%n", LocalDateTime.now().format(formatter));
+        System.out.printf("✅ [%s] Raydium V3 Pool 資訊獲取與儲存任務執行完畢。%n", LocalDateTime.now().format(formatter));
         System.out.println("================================================================================");
+    }
+
+    private void savePoolData(JsonNode poolInfoNode) {
+        try {
+            RaydiumV3PoolData poolData = new RaydiumV3PoolData();
+
+            String poolId = getPathAsString(poolInfoNode, "id", null);
+            if (poolId == null || poolId.equals("N/A")) {
+                System.err.println("❌ 池子 ID 無效，無法儲存資料。");
+                return;
+            }
+            poolData.setPoolId(poolId);
+
+            // 雖然 API 回應的 mintA.symbol 和 mintB.symbol 可能為空或 "N/A"
+            // 但我們的 RaydiumV3PoolData 實體定義了這些欄位，所以還是嘗試獲取
+            // 如果您的業務邏輯確定這些欄位總是"N/A"，可以考慮直接設為 null 或固定值
+            poolData.setMintASymbol(getPathAsString(poolInfoNode, "mintA.symbol", null));
+            poolData.setMintBSymbol(getPathAsString(poolInfoNode, "mintB.symbol", null));
+
+            poolData.setPrice(getPathAsDouble(poolInfoNode, "price", null));
+            poolData.setMintAmountA(getPathAsDouble(poolInfoNode, "mintAmountA", null));
+            poolData.setMintAmountB(getPathAsDouble(poolInfoNode, "mintAmountB", null));
+            poolData.setFeeRate(getPathAsDouble(poolInfoNode, "feeRate", null)); // 儲存原始費率
+            poolData.setTvl(getPathAsDouble(poolInfoNode, "tvl", null));
+            poolData.setDayVolume(getPathAsDouble(poolInfoNode, "day.volume", null));
+            poolData.setDayVolumeFee(getPathAsDouble(poolInfoNode, "day.volumeFee", null));
+            poolData.setDayApr(getPathAsDouble(poolInfoNode, "day.apr", null)); // 儲存原始 APR
+            poolData.setDayFeeApr(getPathAsDouble(poolInfoNode, "day.feeApr", null)); // 儲存原始 Fee APR
+
+            poolData.setFetchedAt(LocalDateTime.now()); // 設定獲取時間
+
+            raydiumV3PoolDataRepository.save(poolData);
+            System.out.printf("💾 池子資料已成功儲存到資料庫 (ID: %s)。%n", poolId);
+
+        } catch (Exception e) {
+            System.err.printf("❌ 儲存池子資料到資料庫時發生錯誤: %s%n", e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void displayPoolDetails(JsonNode poolInfo) {
@@ -85,7 +132,6 @@ public class RaydiumV3PoolInfoFetcher {
         System.out.println("\n💧 池子詳細資訊 (Pool Details):");
         System.out.println("--------------------------------------------------------------------------------");
 
-        // mintA 和 mintB 中的 symbol 在新 JSON 中是空的
         String mintASymbol = getPathAsString(poolInfo, "mintA.symbol", "N/A");
         String mintBSymbol = getPathAsString(poolInfo, "mintB.symbol", "N/A");
 
@@ -96,7 +142,6 @@ public class RaydiumV3PoolInfoFetcher {
         Double tempFeeRate = getPathAsDouble(poolInfo, "feeRate", null);
         String feeRateStr;
         if (tempFeeRate != null) {
-            // feeRate from API (e.g., 0.0001) needs to be multiplied by 100 for percentage display (0.01%)
             feeRateStr = formatAsPercentageNumber(tempFeeRate * 100, 4) + "%";
         } else {
             feeRateStr = "N/A";
@@ -110,7 +155,6 @@ public class RaydiumV3PoolInfoFetcher {
         Double tempDayApr = getPathAsDouble(poolInfo, "day.apr", null);
         String dayAprStr;
         if (tempDayApr != null) {
-            // day.apr from API (e.g., 26.53) is assumed to be the direct percentage value
             dayAprStr = formatAsPercentageNumber(tempDayApr, 2) + "%";
         } else {
             dayAprStr = "N/A";
@@ -119,7 +163,6 @@ public class RaydiumV3PoolInfoFetcher {
         Double tempDayFeeApr = getPathAsDouble(poolInfo, "day.feeApr", null);
         String dayFeeAprStr;
         if (tempDayFeeApr != null) {
-            // day.feeApr from API (e.g., 24.72) is assumed to be the direct percentage value
             dayFeeAprStr = formatAsPercentageNumber(tempDayFeeApr, 2) + "%";
         } else {
             dayFeeAprStr = "N/A";
@@ -153,7 +196,11 @@ public class RaydiumV3PoolInfoFetcher {
             }
             targetNode = targetNode.get(key);
         }
-        return targetNode.isTextual() ? targetNode.asText() : (targetNode.isObject() && targetNode.isEmpty() ? defaultValue : targetNode.toString());
+        // 如果 targetNode 是物件且為空 (例如 {}), 或者不是文字，則回傳 defaultValue 或 toString()
+        if (targetNode.isObject() && targetNode.isEmpty()) {
+            return defaultValue;
+        }
+        return targetNode.isTextual() ? targetNode.asText() : targetNode.toString();
     }
 
     private Double getPathAsDouble(JsonNode node, String path, Double defaultValue) {
@@ -196,14 +243,13 @@ public class RaydiumV3PoolInfoFetcher {
         return df.format(value);
     }
 
-    // Formats a number as a percentage string, assumes 'value' is the number to be displayed before '%'
     private String formatAsPercentageNumber(Double value, int precision) {
         if (value == null) return "N/A";
         try {
             BigDecimal bd = BigDecimal.valueOf(value);
             DecimalFormat df = new DecimalFormat();
             df.setMaximumFractionDigits(precision);
-            df.setMinimumFractionDigits(precision); // Ensure fixed precision
+            df.setMinimumFractionDigits(precision); 
             df.setGroupingUsed(false);
             return df.format(bd);
         } catch (Exception e) {
