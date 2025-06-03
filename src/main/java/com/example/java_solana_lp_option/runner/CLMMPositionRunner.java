@@ -12,8 +12,8 @@ import java.util.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-@Component
-@Order(4) // 在其他 Runner 之後執行
+//@Component
+//@Order(2) // 在其他 Runner 之後執行
 public class CLMMPositionRunner implements CommandLineRunner {
 
     private final CLMMPositionAnalyzer analyzer;
