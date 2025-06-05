@@ -4,7 +4,6 @@ import com.example.java_solana_lp_option.entity.RaydiumV3PoolData; // 新增導�
 import com.example.java_solana_lp_option.repository.RaydiumV3PoolDataRepository; // 新增導入
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired; // 確保 Autowired 被導入
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,7 +28,6 @@ public class RaydiumV3PoolInfoFetcher {
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int API_TIMEOUT_MS = 15000; // 15 秒超時
 
-    @Autowired // 添加 Autowired 以進行依賴注入
     public RaydiumV3PoolInfoFetcher(RaydiumV3PoolDataRepository raydiumV3PoolDataRepository) {
         this.objectMapper = new ObjectMapper();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();

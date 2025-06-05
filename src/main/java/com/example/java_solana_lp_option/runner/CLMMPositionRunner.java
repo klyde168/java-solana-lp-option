@@ -3,10 +3,7 @@ package com.example.java_solana_lp_option.runner;
 import com.example.java_solana_lp_option.analyzer.CLMMPositionAnalyzer;
 import com.example.java_solana_lp_option.config.SolanaConfig;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
-import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 import java.time.LocalDateTime;
@@ -28,7 +25,6 @@ public class CLMMPositionRunner implements CommandLineRunner {
     
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
-    @Autowired
     public CLMMPositionRunner(CLMMPositionAnalyzer analyzer, SolanaConfig solanaConfig) {
         this.analyzer = analyzer;
         this.solanaConfig = solanaConfig;

@@ -11,7 +11,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 
@@ -27,7 +26,6 @@ public class CLMMPositionAnalyzer {
     private static final String DEFAULT_CLMM_POSITION = "BSoUetj6UWvZFYrSnA9KsejAzQZWXUTfFCsB2EWk3LYh";
     private static final String WSOL_MINT = "So11111111111111111111111111111111111111112";
     
-    @Autowired
     public CLMMPositionAnalyzer(SolanaConfig solanaConfig, SolanaService solanaService) {
         this.solanaConfig = solanaConfig;
         this.solanaService = solanaService;

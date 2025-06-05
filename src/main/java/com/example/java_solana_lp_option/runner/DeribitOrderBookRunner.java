@@ -6,10 +6,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import org.springframework.core.annotation.Order;
 import com.example.java_solana_lp_option.entity.OptionData;
 import com.example.java_solana_lp_option.repository.OptionDataRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -24,7 +22,6 @@ public class DeribitOrderBookRunner implements CommandLineRunner {
     private final DateTimeFormatter dateFormatter;
     private final OptionDataRepository optionDataRepository;
 
-    @Autowired
     public DeribitOrderBookRunner(OptionDataRepository optionDataRepository) {
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
