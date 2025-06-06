@@ -81,6 +81,35 @@ public class SolanaService {
     }
     
     /**
+     * 獲取指定帳戶的代幣帳戶
+     */
+    public JsonNode getTokenAccountsByOwner(String ownerAddress, String mintAddress) throws Exception {
+        Map<String, Object> filter = new HashMap<>();
+        if (mintAddress != null) {
+            filter.put("mint", mintAddress);
+        } else {
+            filter.put("programId", "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+        }
+        
+        Map<String, Object> config = new HashMap<>();
+        config.put("encoding", "jsonParsed");
+        config.put("commitment", solanaConfig.getCommitment());
+        
+        return callSolanaRPC("getTokenAccountsByOwner", ownerAddress, filter, config);
+    }
+    
+    /**
+     * 獲取帳戶的交易簽名
+     */
+    public JsonNode getSignaturesForAddress(String address, int limit) throws Exception {
+        Map<String, Object> config = new HashMap<>();
+        config.put("limit", limit);
+        config.put("commitment", solanaConfig.getCommitment());
+        
+        return callSolanaRPC("getSignaturesForAddress", address, config);
+    }
+    
+    /**
      * 獲取多個帳戶資訊
      */
     public JsonNode getMultipleAccounts(List<String> publicKeys) throws Exception {

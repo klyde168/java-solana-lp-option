@@ -79,6 +79,13 @@ public class SolanaConfig {
     private int maxAccountsPerRequest = 100;
     private int accountScanTimeout = 30000;
     
+    /**
+     * Anchor 程式分析配置
+     */
+    private boolean enableAnchorAnalysis = true;
+    private int anchorCacheSize = 50;
+    private long anchorCacheExpiry = 3600000; // 1 hour in milliseconds
+    
     // Getters and Setters
     public String getRpcUrl() {
         return rpcUrl;
@@ -198,6 +205,30 @@ public class SolanaConfig {
     
     public void setAccountScanTimeout(int accountScanTimeout) {
         this.accountScanTimeout = accountScanTimeout;
+    }
+    
+    public boolean isEnableAnchorAnalysis() {
+        return enableAnchorAnalysis;
+    }
+    
+    public void setEnableAnchorAnalysis(boolean enableAnchorAnalysis) {
+        this.enableAnchorAnalysis = enableAnchorAnalysis;
+    }
+    
+    public int getAnchorCacheSize() {
+        return anchorCacheSize;
+    }
+    
+    public void setAnchorCacheSize(int anchorCacheSize) {
+        this.anchorCacheSize = anchorCacheSize;
+    }
+    
+    public long getAnchorCacheExpiry() {
+        return anchorCacheExpiry;
+    }
+    
+    public void setAnchorCacheExpiry(long anchorCacheExpiry) {
+        this.anchorCacheExpiry = anchorCacheExpiry;
     }
     
     /**

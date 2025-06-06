@@ -17,7 +17,7 @@ import org.springframework.context.ApplicationContext;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+//@Component
 @Order(1)
 public class DeribitInstrumentsRunner implements CommandLineRunner {
 
