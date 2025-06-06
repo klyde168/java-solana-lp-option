@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-@Component
+//@Component
 @Order(3)
 public class SolanaAccountRunner implements CommandLineRunner {
 
