@@ -10,14 +10,16 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import java.util.ArrayList;
 import java.util.List;
 
-//@Component
+@Component
 @Order(1)
 public class DeribitInstrumentsRunner implements CommandLineRunner {
 
@@ -37,18 +39,18 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         System.out.println("=== 應用程式啟動，DeribitInstrumentsRunner 已啟用 ===");
-        System.out.println("📅 排程設定：");
-        System.out.println("   🕐 每8小時執行：每天 0:00, 8:00, 16:00");
-        System.out.println("   🕐 每1小時執行：每小時的整點");
-        System.out.println("   🕐 每3分鐘執行：每小時的 0, 3, 6, 9... 分");
+        // System.out.println("📅 排程設定：");
+        // System.out.println("   🕐 每4小時執行：每天 0:00, 8:00, 16:00");
+        // System.out.println("   🕐 每1小時執行：每小時的整點");
+        // System.out.println("   🕐 每3分鐘執行：每小時的 0, 3, 6, 9... 分");
         
         fetchInstruments("啟動時執行");
     }
     
-    @Scheduled(cron = "0 0 */8 * * *")
+    @Scheduled(cron = "0 0 */4 * * *")
     public void scheduledFetchInstruments8Hours() {
-        System.out.println("\n⏰ 8小時定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
-        fetchInstruments("每8小時執行");
+        System.out.println("\n⏰ 4小時定時任務觸發 - " + LocalDateTime.now().format(dateFormatter));
+        fetchInstruments("每4小時執行");
     }
     
     // @Scheduled(cron = "0 0 * * * *")
@@ -66,10 +68,20 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
     private void fetchInstruments(String trigger) {
         System.out.println("=== 開始執行 Deribit 工具列表查詢 (" + trigger + ") ===");
         
+        // 查詢 USDC 選擇權
+        //fetchInstrumentsByCurrency("USDC", trigger);
+        
+        // 查詢 ETH 選擇權
+        fetchInstrumentsByCurrency("ETH", trigger);
+        
+        System.out.println("=== Deribit 工具列表查詢完成 (" + trigger + ") ===");
+    }
+    
+    private void fetchInstrumentsByCurrency(String currency, String trigger) {
         try {
-            String apiUrl = "https://www.deribit.com/api/v2/public/get_instruments?currency=USDC&kind=option";
+            String apiUrl = "https://www.deribit.com/api/v2/public/get_instruments?currency=" + currency + "&kind=option";
             
-            System.out.println("正在呼叫 API: " + apiUrl);
+            System.out.println("正在呼叫 " + currency + " API: " + apiUrl);
             
             ResponseEntity<String> response = restTemplate.getForEntity(apiUrl, String.class);
             
@@ -79,7 +91,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
                 
                 JsonNode result = jsonNode.get("result");
                 if (result != null && result.isArray()) {
-                    System.out.println("成功取得 " + result.size() + " 個選擇權工具，正在篩選 SOL 基礎貨幣的工具:");
+                    System.out.println("成功取得 " + result.size() + " 個 " + currency + " 選擇權工具，正在篩選到期日>7天的工具:");
                     System.out.println("=".repeat(80));
                     
                     int totalCount = 0;
@@ -88,24 +100,27 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
                     
                     for (JsonNode instrument : result) {
                         JsonNode baseCurrencyNode = instrument.get("base_currency");
-                        if (baseCurrencyNode != null && "SOL".equals(baseCurrencyNode.asText())) {
+                        String expirationTimestamp = instrument.get("expiration_timestamp").asText();
+                        long daysUntilExpiration = calculateDaysUntilExpiration(expirationTimestamp);
+                        
+                        // 只處理到期日大於7天的選擇權
+                        if (daysUntilExpiration > 7) {
                             totalCount++;
                             String instrumentName = instrument.get("instrument_name").asText();
                             solInstruments.add(instrumentName);
                             
                             if (displayCount < 10) {
-                                String expirationTimestamp = instrument.get("expiration_timestamp").asText();
                                 String strike = instrument.get("strike").asText();
                                 String optionType = instrument.get("option_type").asText();
-                                String baseCurrency = baseCurrencyNode.asText();
+                                String baseCurrency = baseCurrencyNode != null ? baseCurrencyNode.asText() : "N/A";
                                 
                                 String formattedDate = formatTimestamp(expirationTimestamp);
                                 
-                                System.out.printf("SOL 工具 %d: %s%n", displayCount + 1, instrumentName);
+                                System.out.printf("工具 %d: %s%n", displayCount + 1, instrumentName);
                                 System.out.printf("  基礎貨幣: %s%n", baseCurrency);
                                 System.out.printf("  類型: %s 選擇權%n", optionType.toUpperCase());
                                 System.out.printf("  履約價: %s%n", strike);
-                                System.out.printf("  到期時間: %s%n", formattedDate);
+                                System.out.printf("  到期時間: %s (%d 天後)%n", formattedDate, daysUntilExpiration);
                                 System.out.println("-".repeat(50));
                                 
                                 displayCount++;
@@ -114,39 +129,44 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
                     }
                     
                     if (totalCount > 10) {
-                        System.out.println("... 以及其他 " + (totalCount - 10) + " 個 SOL 選擇權工具");
+                        System.out.println("... 以及其他 " + (totalCount - 10) + " 個選擇權工具");
                     }
                     
                     if (totalCount > 0) {
-                        System.out.println("總計: " + totalCount + " 個 SOL 基礎貨幣的 USDC 選擇權工具");
+                        System.out.println("總計: " + totalCount + " 個到期日>7天的 " + currency + " 選擇權工具");
                         
                         // 呼叫 OrderBookRunner 處理每個工具，每秒一次
-                        System.out.println("\n🔄 開始逐一查詢每個 SOL 工具的訂單簿資料...");
+                        System.out.println("\n🔄 開始逐一查詢每個工具的訂單簿資料...");
                         processInstrumentsWithDelay(solInstruments);
                     } else {
-                        System.out.println("⚠️  沒有找到 base_currency 為 SOL 的選擇權工具");
+                        System.out.println("⚠️  沒有找到到期日>7天的 " + currency + " 選擇權工具");
                     }
                 } else {
-                    System.out.println("API 回應中沒有找到工具資料");
+                    System.out.println(currency + " API 回應中沒有找到工具資料");
                 }
                 
             } else {
-                System.err.println("API 呼叫失敗，狀態碼: " + response.getStatusCode());
+                System.err.println(currency + " API 呼叫失敗，狀態碼: " + response.getStatusCode());
             }
             
         } catch (Exception e) {
-            System.err.println("執行過程中發生錯誤: " + e.getMessage());
+            System.err.println("執行 " + currency + " 查詢過程中發生錯誤: " + e.getMessage());
             e.printStackTrace();
         }
-        
-        System.out.println("=== Deribit 工具列表查詢完成 (" + trigger + ") ===");
     }
     
     /**
-     * 逐一處理工具列表，每秒傳送一個給 OrderBookRunner
+     * 逐一處理工具列表，每0.5秒傳送一個給 OrderBookRunner
      */
     private void processInstrumentsWithDelay(List<String> instruments) {
         try {
+            // 檢查 ApplicationContext 是否仍然活躍
+            if (applicationContext instanceof ConfigurableApplicationContext && 
+                !((ConfigurableApplicationContext) applicationContext).isActive()) {
+                System.out.println("⚠️  ApplicationContext 已關閉，停止處理工具列表");
+                return;
+            }
+            
             // 使用 ApplicationContext 來獲取 OrderBookRunner，避免循環依賴
             DeribitOrderBookRunner orderBookRunner = applicationContext.getBean(DeribitOrderBookRunner.class);
             
@@ -154,16 +174,23 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
                 String instrumentName = instruments.get(i);
                 
                 try {
+                    // 在每次迭代中檢查 ApplicationContext 是否仍然活躍
+                    if (applicationContext instanceof ConfigurableApplicationContext && 
+                        !((ConfigurableApplicationContext) applicationContext).isActive()) {
+                        System.out.println("⚠️  ApplicationContext 已關閉，中止剩餘工具處理");
+                        break;
+                    }
+                    
                     System.out.printf("\n📊 處理第 %d/%d 個工具: %s%n", 
                         i + 1, instruments.size(), instrumentName);
                     
                     // 呼叫 OrderBookRunner 的方法
                     orderBookRunner.fetchOrderBookData(instrumentName);
                     
-                    // 如果不是最後一個，等待1秒
+                    // 如果不是最後一個，等待0.5秒
                     if (i < instruments.size() - 1) {
-                        System.out.println("⏱️  等待 1 秒後處理下一個工具...");
-                        Thread.sleep(1000); // 等待1秒
+                        System.out.println("⏱️  等待 0.5 秒後處理下一個工具...");
+                        Thread.sleep(500); // 等待0.5秒
                     }
                     
                 } catch (InterruptedException e) {
@@ -176,7 +203,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
                 }
             }
             
-            System.out.printf("\n✅ 完成處理 %d 個 SOL 工具的訂單簿查詢%n", instruments.size());
+            System.out.printf("\n✅ 完成處理 %d 個工具的訂單簿查詢%n", instruments.size());
             
         } catch (Exception e) {
             System.err.println("❌ 無法獲取 DeribitOrderBookRunner Bean: " + e.getMessage());
@@ -192,6 +219,21 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
         } catch (NumberFormatException e) {
             System.err.println("無法解析時間戳記: " + timestampStr);
             return timestampStr;
+        }
+    }
+    
+    private long calculateDaysUntilExpiration(String timestampStr) {
+        try {
+            long timestamp = Long.parseLong(timestampStr);
+            Instant expirationInstant = Instant.ofEpochMilli(timestamp);
+            Instant now = Instant.now();
+            
+            // 計算兩個時間點之間的天數差異
+            long days = ChronoUnit.DAYS.between(now, expirationInstant);
+            return days;
+        } catch (NumberFormatException e) {
+            System.err.println("無法解析到期時間戳記: " + timestampStr);
+            return 0;
         }
     }
 }

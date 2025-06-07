@@ -12,9 +12,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import org.springframework.core.annotation.Order;
 
-//@Component
-//@Order(2) // 讓這個 Runner 在 DeribitInstrumentsRunner 之後執行
+@Component
+@Order(2) // 讓這個 Runner 在 DeribitInstrumentsRunner 之後執行
 public class DeribitOrderBookRunner implements CommandLineRunner {
 
     private final RestTemplate restTemplate;

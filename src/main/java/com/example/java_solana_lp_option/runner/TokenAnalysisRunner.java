@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 
-@Component
+//@Component
 @Order(5)
 public class TokenAnalysisRunner implements CommandLineRunner {
 
