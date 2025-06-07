@@ -19,7 +19,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.util.ArrayList;
 import java.util.List;
 
-@Component
+//@Component
 @Order(1)
 public class DeribitInstrumentsRunner implements CommandLineRunner {
 
@@ -69,7 +69,7 @@ public class DeribitInstrumentsRunner implements CommandLineRunner {
         System.out.println("=== 開始執行 Deribit 工具列表查詢 (" + trigger + ") ===");
         
         // 查詢 USDC 選擇權
-        //fetchInstrumentsByCurrency("USDC", trigger);
+        fetchInstrumentsByCurrency("USDC", trigger);
         
         // 查詢 ETH 選擇權
         fetchInstrumentsByCurrency("ETH", trigger);
